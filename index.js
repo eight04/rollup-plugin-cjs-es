@@ -69,7 +69,9 @@ function factory(options = {}) {
       maps.push(result.map);
       return {
         code,
-        map: maps.length === 1 ? maps[0] : mergeSourceMap(maps[0], maps[1])
+        map: options.sourceMap ? 
+          (maps.length === 1 ? maps[0] : mergeSourceMap(maps[0], maps[1])) :
+          undefined
       };
     }
   };
