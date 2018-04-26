@@ -24,6 +24,7 @@
   "dependencies": {
     "cjs-es": "^0.2.2",
     "cjs-hoist": "^0.1.3",
+    "estree-walker": "^0.5.1",
     "magic-string": "^0.24.0",
     "merge-source-map": "^1.1.0",
     "rollup-pluginutils": "^2.0.1"
