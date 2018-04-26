@@ -30,8 +30,7 @@ export default {
       exportStyle: "default",
       sourceMap: true,
       splitCode: true,
-      hoist: true,
-      ignoreDynamicRequire: true
+      hoist: true
     })
   ]
 };
@@ -40,7 +39,7 @@ export default {
 Compatibility
 -------------
 
-`cjs-es` can only transform toplevel `require`, `exports`, and `module.exports` statements. For those non-toplevel statements, the transformer use `cjs-hoist` to hoist them to toplevel (optional):
+`cjs-es` can only transform toplevel `require`, `exports`, and `module.exports` statements. For those non-toplevel statements, the transformer use `cjs-hoist` to hoist them to toplevel (optional, off by default):
 
 ```js
 const baz = require("foo").bar.baz;
@@ -126,7 +125,7 @@ module.exports = {
 };
 ```
 
-Or, by adding a special comment `// split` if you can't use async function:
+Or, by adding a special comment `// split` if you can't use async function (must set `options.splitCode` to `true`):
 
 ```js
 module.exports = {
@@ -137,6 +136,80 @@ module.exports = {
 ```
 
 Note that in the later form, the result is a sync `require` function call, which means **the output format must be `cjs`**.
+
+Named import/export v.s. default import/export
+----------------------------------------------
+
+In the following example, you would get an error:
+
+*entry.js*
+```js
+const foo = require("./foo");
+foo();
+```
+
+*foo.js*
+```js
+module.exports = function() {
+  console.log("foo");
+};
+```
+
+API reference
+-------------
+
+This module exports a single function.
+
+### cjsEsFactory(options?: object): RollupPlugin object
+
+`options` may have following optional properties:
+
+* `include`: `Array<string>`. A list of minimatch pattern. Only matched files would be transformed. Match all files by default.
+* `exclude`: `Array<string>`. A list of minimatch pattern. Override `options.include`. Default: `[]`.
+* `sourceMap`: `boolean`. If true then generate the source map. Default: `true`.
+* `splitCode`: `boolean|function`. If true then enable code-splitting for require statements which are marked as `// split`. See [Lazy load and code splitting](#lazy-load-and-code-splitting) for details.
+
+  If `splitCode` is a function, it would receives 2 arguments:
+  
+  - `importer`: `string`. The module ID which is being transformed. It is usually an absolute path.
+  - `importee`: `string`. The id inside `require()` function.
+  
+  The return value should be a `boolean`.
+  
+  Default: `false`
+  
+* `hoist`: `boolean`. If true then enable cjs-hoist transformer. Default: `false`.
+* `importStyle`: `string|object|function`. Change the importStyle option for cjs-es.
+
+  If `importStyle` is a function, it receives 2 arguments:
+  
+  - `importer`: `string`. The module ID which is being transformed.
+  - `importee`: `string`. The id inside `require()` function.
+  
+  The return value should be `"named"` or `"default"`.
+  
+  If `importStyle` is an object, it is a 2 depth map. For example:
+  
+  ```js
+  importStyle: {
+    "path/to/moduleA": "default", // set importStyle to "default" for moduleA
+    "path/to/moduleB": {
+      "./foo": "default" // set importStyle to "default" for moduleB and 
+    }                    // only when requiring `./foo` module.
+  }
+  ```
+
+  Default: `"named"`.
+  
+* `exportStyle`: `string|object|function`. Change the exportStyle option for cjs-es.
+
+  If `exportStyle` is a function, it receives 1 argument:
+  
+  - `exporter`: `string`. The module ID which is being transformed.
+  
+  If `exportStyle` is an object, it is a `"path/to/module": "value"` map.
+  
+  Default: `"named"`.
 
 Changelog
 ---------
