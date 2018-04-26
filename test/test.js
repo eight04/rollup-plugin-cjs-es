@@ -126,22 +126,20 @@ if (foo) {
   it("hoist", () => test("import-anywhere.js", {hoist: true}, hoisted));
 });
 
-describe("hoist ignoreDynamicRequire", () => {
+describe("hoist dynamicImport", () => {
+  const orig = readFixture("import-dynamic.js");
   const hoisted = `
 import * as _require_foo_ from "foo";
 Promise.resolve(_require_foo_).then(bar);
   `.trim();
-  const ignored = `
+  const dynamic = `
 import("foo").then(bar);
   `.trim();
   
-  it("normal", () => test("import-dynamic.js", undefined, ignored));
-  it("hoist", () => test("import-dynamic.js", {hoist: true}, ignored));
-  it("hoist no ignore", () =>
-    test("import-dynamic.js", {
-      hoist: true,
-      ignoreDynamicRequire: false
-    }, hoisted)
+  it("normal", () => test("import-dynamic.js", undefined, orig));
+  it("hoist", () => test("import-dynamic.js", {hoist: true}, hoisted));
+  it("hoist + dynamic", () =>
+    test("import-dynamic.js", {hoist: true, dynamicImport: true}, dynamic)
   );
 });
 

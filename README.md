@@ -30,7 +30,8 @@ export default {
       exportStyle: "default",
       sourceMap: true,
       splitCode: true,
-      hoist: true
+      hoist: true,
+      dynamicImport: true
     })
   ]
 };
@@ -316,7 +317,8 @@ This module exports a single function.
   
   Default: `false`
   
-* `hoist`: `boolean`. If true then enable cjs-hoist transformer. Default: `false`.
+* `hoist`: `boolean`. If true then enable [hoist transformer](https://github.com/eight04/cjs-es#hoist). Default: `false`.
+* `dynamicImport`: `boolean`. If true then enable [dynamic import transformer](https://github.com/eight04/cjs-es#dynamic-import). Default: `false`.
 * `importStyle`: `string|object|function`. Change the importStyle option for cjs-es.
 
   If `importStyle` is a function, it receives 2 arguments:

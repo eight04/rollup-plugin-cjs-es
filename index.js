@@ -1,7 +1,6 @@
 const path = require("path");
 
-const {transform: cjsToEs} = require("cjs-es");
-const {transform: cjsHoist} = require("cjs-hoist");
+const {transform: cjsEs} = require("cjs-es");
 const mergeSourceMap = require("merge-source-map");
 const {createFilter} = require("rollup-pluginutils");
 
@@ -86,25 +85,14 @@ function factory(options = {}) {
           isTouched = true;
         }
       }
-      if (options.hoist) {
-        const result = cjsHoist({
-          code,
-          parse,
-          sourceMap: options.sourceMap,
-          ignoreDynamicRequire: options.ignoreDynamicRequire
-        });
-        if (result.isTouched) {
-          code = result.code;
-          maps.push(result.map);
-          isTouched = true;
-        }
-      }
-      const result = cjsToEs({
+      const result = cjsEs({
         code,
         parse,
         sourceMap: options.sourceMap,
         importStyle: requireId => getPreferStyle("import", id, requireId),
-        exportStyle: () => getPreferStyle("export", id)
+        exportStyle: () => getPreferStyle("export", id),
+        hoist: options.hoist,
+        dynamicImport: options.dynamicImport
       });
       if (result.isTouched) {
         code = result.code;
