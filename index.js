@@ -7,6 +7,13 @@ const {createFilter} = require("rollup-pluginutils");
 
 const {wrapImport, unwrapImport} = require("./lib/transform");
 
+function joinMaps(maps) {
+  while (maps.length > 1) {
+    maps[maps.length - 2] = mergeSourceMap(maps[maps.length - 2], maps.pop());
+  }
+  return maps[0];
+}
+
 function factory(options = {}) {
   const name = "rollup-plugin-cjs-es";
   let isImportWrapped = false;
@@ -60,6 +67,7 @@ function factory(options = {}) {
       }
       parse = this.parse;
       const maps = [];
+      let isTouched;
       if (options.splitCode) {
         const result = wrapImport({
           code,
@@ -75,6 +83,7 @@ function factory(options = {}) {
           code = result.code;
           maps.push(result.map);
           isImportWrapped = true;
+          isTouched = true;
         }
       }
       if (options.hoist) {
@@ -87,6 +96,7 @@ function factory(options = {}) {
         if (result.isTouched) {
           code = result.code;
           maps.push(result.map);
+          isTouched = true;
         }
       }
       const result = cjsToEs({
@@ -99,13 +109,14 @@ function factory(options = {}) {
       if (result.isTouched) {
         code = result.code;
         maps.push(result.map);
+        isTouched = true;
       }
-      return {
-        code,
-        map: options.sourceMap && maps.length ? 
-          (maps.length === 1 ? maps[0] : mergeSourceMap(maps[0], maps[1])) :
-          undefined
-      };
+      if (isTouched) {
+        return {
+          code,
+          map: options.sourceMap && maps.length && joinMaps(maps)
+        };
+      }
     },
     transformBundle(code, {format}) {
       if (!isImportWrapped) {
