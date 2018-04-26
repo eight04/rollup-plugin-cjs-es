@@ -4,17 +4,15 @@ const assert = require("assert");
 const cjsToEs = require("..");
 const rollup = require("rollup");
 
-function test(file, options, expect) {
-  let actual;
+function bundle(file, options) {
+  const codes = [];
   return rollup.rollup({
     input: [`${__dirname}/fixtures/${file}`],
     plugins: [
       cjsToEs(options),
-      {
-        transform(code) {
-          actual = code;
-        }
-      }
+      {transform(code) {
+        codes.push(code);
+      }}
     ],
     experimentalCodeSplitting: true,
     experimentalDynamicImport: true
@@ -24,8 +22,13 @@ function test(file, options, expect) {
       legacy: true,
       freeze: false
     }))
-    .then(() => {
-      assert.equal(actual.replace(/\r/g, ""), expect);
+    .then(bundleResult => ({codes, bundleResult}));
+}
+
+function test(file, options, expect) {
+  return bundle(file, options)
+    .then(({codes: [code]}) => {
+      assert.equal(code.replace(/\r/g, ""), expect);
     });
 }
 
