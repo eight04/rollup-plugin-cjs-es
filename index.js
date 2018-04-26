@@ -73,7 +73,7 @@ function factory(options = {}) {
           code,
           parse,
           shouldSplitCode: importee => {
-            if (options.splitCode === "function") {
+            if (typeof options.splitCode === "function") {
               return options.splitCode(id, importee);
             }
             return false;
