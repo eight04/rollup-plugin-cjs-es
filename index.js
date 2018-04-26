@@ -9,6 +9,8 @@ const {wrapImport, unwrapImport} = require("./lib/transform");
 
 function factory(options = {}) {
   const name = "rollup-plugin-cjs-es";
+  let isImportWraped = false;
+  let parse = null;
   
   // normalize map key to absolute path
   [options.importStyle, options.exportStyle].forEach(map => {
@@ -56,11 +58,12 @@ function factory(options = {}) {
       if (!filter(id)) {
         return;
       }
+      parse = this.parse;
       const maps = [];
       if (options.splitCode) {
         const result = wrapImport({
           code,
-          parse: this.parse,
+          parse,
           shouldSplitCode: importee => {
             if (options.splitCode === "function") {
               return options.splitCode(id, importee);
@@ -71,12 +74,13 @@ function factory(options = {}) {
         if (result.isTouched) {
           code = result.code;
           maps.push(result.map);
+          isImportWraped = true;
         }
       }
       if (options.hoist) {
         const result = cjsHoist({
           code,
-          parse: this.parse,
+          parse,
           sourceMap: options.sourceMap,
           ignoreDynamicRequire: options.ignoreDynamicRequire
         });
@@ -87,7 +91,7 @@ function factory(options = {}) {
       }
       const result = cjsToEs({
         code,
-        parse: this.parse,
+        parse,
         sourceMap: options.sourceMap,
         importStyle: requireId => getPreferStyle("import", id, requireId),
         exportStyle: () => getPreferStyle("export", id)
@@ -104,7 +108,7 @@ function factory(options = {}) {
       };
     },
     transformBundle(code, {format}) {
-      if (!options.splitCode) {
+      if (!isImportWraped) {
         return;
       }
       if (format !== "cjs") {
@@ -112,7 +116,7 @@ function factory(options = {}) {
       }
       const result = unwrapImport({
         code,
-        parse: this.parse,
+        parse,
         sourceMap: options.sourceMap
       });
       if (result.isTouched) {

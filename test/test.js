@@ -18,7 +18,7 @@ function bundle(file, options) {
     experimentalDynamicImport: true
   })
     .then(bundle => bundle.generate({
-      format: "es",
+      format: "cjs",
       legacy: true,
       freeze: false
     }))
@@ -141,5 +141,38 @@ import("foo").then(bar);
       hoist: true,
       ignoreDynamicRequire: false
     }, hoisted)
+  );
+});
+
+describe("splitCode", () => {
+  it("normal", () =>
+    bundle("split-code-a.js", undefined).then(({bundleResult}) => {
+      assert.equal(Object.keys(bundleResult).length, 1);
+      const module = bundleResult["split-code-a.js"];
+      assert(module);
+      assert.equal(module.modules.length, 1);
+      assert(module.code.includes("require("));
+    })
+  );
+  it("hoist", () =>
+    bundle("split-code-a.js", {hoist: true}).then(({bundleResult}) => {
+      assert.equal(Object.keys(bundleResult).length, 1);
+      const module = bundleResult["split-code-a.js"];
+      assert(module);
+      assert.equal(module.modules.length, 2);
+      assert(!module.code.includes("require("));
+    })
+  );
+  it("splitCode", () =>
+    bundle("split-code-a.js", {hoist: true, splitCode: true}).then(({bundleResult}) => {
+      assert.equal(Object.keys(bundleResult).length, 2);
+      const moduleA = bundleResult["split-code-a.js"];
+      assert(moduleA);
+      assert.equal(moduleA.modules.length, 1);
+      assert(moduleA.code.includes("require("));
+      const moduleB = bundleResult["split-code-b.js"];
+      assert(moduleB);
+      assert.equal(moduleB.modules.length, 1);
+    })
   );
 });
