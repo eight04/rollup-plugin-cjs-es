@@ -68,7 +68,7 @@ function factory(options = {}) {
             return false;
           }
         });
-        if (result.touched) {
+        if (result.isTouched) {
           code = result.code;
           maps.push(result.map);
         }
@@ -80,7 +80,7 @@ function factory(options = {}) {
           sourceMap: options.sourceMap,
           ignoreDynamicRequire: options.ignoreDynamicRequire
         });
-        if (result.touched) {
+        if (result.isTouched) {
           code = result.code;
           maps.push(result.map);
         }
@@ -92,7 +92,7 @@ function factory(options = {}) {
         importStyle: requireId => getPreferStyle("import", id, requireId),
         exportStyle: () => getPreferStyle("export", id)
       });
-      if (result.touched) {
+      if (result.isTouched) {
         code = result.code;
         maps.push(result.map);
       }
@@ -115,7 +115,7 @@ function factory(options = {}) {
         parse: this.parse,
         sourceMap: options.sourceMap
       });
-      if (result.touched) {
+      if (result.isTouched) {
         return {
           code: result.code,
           map: result.map
