@@ -9,7 +9,7 @@ const {wrapImport, unwrapImport} = require("./lib/transform");
 
 function factory(options = {}) {
   const name = "rollup-plugin-cjs-es";
-  let isImportWraped = false;
+  let isImportWrapped = false;
   let parse = null;
   
   // normalize map key to absolute path
@@ -74,7 +74,7 @@ function factory(options = {}) {
         if (result.isTouched) {
           code = result.code;
           maps.push(result.map);
-          isImportWraped = true;
+          isImportWrapped = true;
         }
       }
       if (options.hoist) {
@@ -108,7 +108,7 @@ function factory(options = {}) {
       };
     },
     transformBundle(code, {format}) {
-      if (!isImportWraped) {
+      if (!isImportWrapped) {
         return;
       }
       if (format !== "cjs") {
