@@ -2,11 +2,12 @@ const path = require("path");
 const {transform: cjsToEs} = require("cjs-es");
 const {transform: cjsHoist} = require("cjs-hoist");
 const mergeSourceMap = require("merge-source-map");
+const {createFilter} = require("rollup-pluginutils");
 
 function factory(options = {}) {
   const name = "rollup-plugin-cjs-es";
   
-  // convert to absolute path
+  // normalize map key to absolute path
   [options.importStyle, options.exportStyle].forEach(map => {
     if (typeof map === "object") {
       for (const key of Object.keys(map)) {
@@ -44,9 +45,14 @@ function factory(options = {}) {
     options.sourceMap = true;
   }
   
+  const filter = createFilter(options.include, options.exclude);
+  
 	return {
     name,
     transform(code, id) {
+      if (!filter(id)) {
+        return;
+      }
       const maps = [];
       if (options.hoist) {
         const result = cjsHoist({
