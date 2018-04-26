@@ -233,6 +233,66 @@ nction
 
 Avoid default export if you want to use dynamic `import()` + CommonJS in the same time.
 
+### rollup-plugin-commonjs
+
+The [commonjs](https://github.com/rollup/rollup-plugin-commonjs) plugin uses a smart method to determine whether to use named or default import. It creates a proxy loader when a module is imported:
+
+*source*
+```js
+const foo = require("foo");
+foo.bar();
+```
+
+*transformed*
+```js
+import "foo";
+import foo from "commonjs-proxy:foo";
+foo.bar();
+```
+
+With this method, it can first look into the `"foo"` module to check its export type, then generate the proxy module which maps named exports into a default export. However, if the required module `"foo"` uses named exports, it have to be converted into a single object then export the single object:
+
+*commonjs-proxy:foo*
+```js
+import * as _ from "foo";
+export default _;
+```
+
+As the result, all named exports are included in the bundle even that only `bar` is used.
+
+The same problem applies to cjs-es as well if you force a module to use default export:
+
+*entry.js*
+```js
+const foo = require("./foo");
+foo.foo();
+```
+
+*foo.js*
+```js
+module.exports = {
+  foo: () => console.log("foo"),
+  bar: () => console.log("bar")
+};
+```
+
+*bundled*
+```js
+const _export_foo_ = () => console.log("foo");
+
+_export_foo_();
+```
+
+*bundled with `importStyle: "default"` and `exportStyle: "default"`*
+```js
+var foo = {
+  foo: () => console.log("foo"),
+  bar: () => console.log("bar")
+};
+
+foo.foo();
+```
+
 API reference
 -------------
 
