@@ -151,7 +151,7 @@ describe("splitCode", () => {
       const module = bundleResult["split-code-a.js"];
       assert(module);
       assert.equal(module.modules.length, 1);
-      assert(module.code.includes("require("));
+      assert(module.code.includes("return require"));
     })
   );
   it("hoist", () =>
@@ -169,7 +169,7 @@ describe("splitCode", () => {
       const moduleA = bundleResult["split-code-a.js"];
       assert(moduleA);
       assert.equal(moduleA.modules.length, 1);
-      assert(moduleA.code.includes("require("));
+      assert(moduleA.code.includes("return require"));
       const moduleB = bundleResult["split-code-b.js"];
       assert(moduleB);
       assert.equal(moduleB.modules.length, 1);
