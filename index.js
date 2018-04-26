@@ -61,7 +61,7 @@ function factory(options = {}) {
         const result = wrapImport({
           code,
           parse: this.parse,
-          splitCode: importee => {
+          shouldSplitCode: importee => {
             if (options.splitCode === "function") {
               return options.splitCode(id, importee);
             }
@@ -103,7 +103,7 @@ function factory(options = {}) {
           undefined
       };
     },
-    transformBundle(source, {format}) {
+    transformBundle(code, {format}) {
       if (!options.splitCode) {
         return;
       }

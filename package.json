@@ -24,6 +24,9 @@
   "dependencies": {
     "cjs-es": "^0.2.0",
     "cjs-hoist": "^0.1.0",
+    "ecma-variable-scope": "^2.1.0",
+    "estraverse": "^4.2.0",
+    "magic-string": "^0.24.0",
     "merge-source-map": "^1.1.0",
     "rollup-pluginutils": "^2.0.1"
   },
