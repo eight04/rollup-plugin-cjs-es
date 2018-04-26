@@ -213,7 +213,7 @@ export default foo;
 
 To correctly call the default member, `entry.js` has to be modified:
 
-```
+```js
 Promise.resolve(require("./foo"))
   .then(foo => foo.default());
 ```
