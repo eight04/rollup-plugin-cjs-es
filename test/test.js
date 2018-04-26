@@ -20,7 +20,8 @@ function bundle(file, options) {
     .then(bundle => bundle.generate({
       format: "cjs",
       legacy: true,
-      freeze: false
+      freeze: false,
+      sourcemap: true
     }))
     .then(bundleResult => ({codes, bundleResult}));
 }
