@@ -1,13 +1,41 @@
 rollup-plugin-cjs-es
 ====================
 
-Convert CommonJS module into ES module. Powered by [cjs-es][1] and [cjs-hoist][2].
+Convert CommonJS module into ES module. Powered by [cjs-es](https://github.com/eight04/cjs-es) and [cjs-hoist](https://github.com/eight04/cjs-hoist).
 
-[1]: https://github.com/eight04/cjs-es
-[2]: https://github.com/eight04/cjs-hoist
+Installation
+------------
+
+```
+npm install -D rollup-plugin-cjs-es
+```
 
 Usage
 -----
+
+```js
+import cjsEs from "rollup-plugin-cjs-es"
+
+export default {
+  input: ["entry.js"],
+  output: {
+    dir: "dist",
+    format: "cjs"
+  },
+  plugins: [
+    cjsEs({
+      include: ["*.js"],
+      exclude: [],
+      importStyle: "default",
+      exportStyle: "default",
+      sourceMap: true,
+      splitCode: true,
+      hoist: true,
+      ignoreDynamicRequire: true
+    })
+  ]
+};
+```
 
 Compatibility
 -------------
@@ -109,3 +137,10 @@ module.exports = {
 ```
 
 Note that in the later form, the result is a sync `require` function call, which means **the output format must be `cjs`**.
+
+Changelog
+---------
+
+* 0.1.0 (?)
+
+  - Initial releast.
