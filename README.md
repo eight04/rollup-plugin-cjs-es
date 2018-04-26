@@ -140,6 +140,8 @@ Note that in the later form, the result is a sync `require` function call, which
 Named import/export v.s. default import/export
 ----------------------------------------------
 
+### Cannot call a namespace
+
 In the following example, you would get an error:
 
 *entry.js*
@@ -154,6 +156,82 @@ module.exports = function() {
   console.log("foo");
 };
 ```
+
+```
+entry.js → dist...
+[!] Error: Cannot call a namespace ('foo')
+entry.js (2:0)
+1: const foo = require("./foo");
+2: foo();
+   ^
+```
+
+To fix it, [mark the require as `// default`](https://github.com/eight04/cjs-es#import-style) or use the `importStyle` option.
+
+However, adding comments manually could be a problem if they are mixed everywhere. In this case, you may want to set both `importStyle` and `exportStyle` to `"default"` so the plugin uses default import/export everywhere.
+
+### Dynamic import() problem with default export
+
+In the following example, you would get an error **under ES enviroment**:
+
+*entry.js*
+```js
+Promise.resolve(require("./foo"))
+  .then(foo => foo());
+```
+
+*foo.js*
+```js
+module.exports = function() {
+  console.log("foo");
+};
+```
+
+After rolluped into ES format and renamed them into `.mjs`:
+
+*entry.mjs*
+```js
+import("./foo.mjs")
+  .then(foo => foo());
+```
+
+*foo.mjs*
+```js
+function foo() {
+  console.log("foo");
+}
+
+export default foo;
+```
+
+```
+(node:9996) ExperimentalWarning: The ESM module loader is experimental.
+(node:9996) UnhandledPromiseRejectionWarning: TypeError: foo is not a function
+    at then.foo (file:///D:/Dev/node-test/dist/entry.mjs:2:16)
+    at <anonymous>
+```
+
+To correctly call the default member, `entry.js` has to be modified:
+
+```
+Promise.resolve(require("./foo"))
+  .then(foo => foo.default());
+```
+
+However, this would break other enviroments like CommonJS:
+
+```
+(node:9432) UnhandledPromiseRejectionWarning: TypeError: foo.default is not a fu
+nction
+    at Promise.resolve.then.foo (D:\Dev\node-test\dist\entry.js:4:27)
+    at <anonymous>
+    at process._tickCallback (internal/process/next_tick.js:118:7)
+    at Function.Module.runMain (module.js:705:11)
+    at startup (bootstrap_node.js:193:16)
+    at bootstrap_node.js:660:3
+```
+
+Avoid default export if you want to use dynamic `import()` + CommonJS in the same time.
 
 API reference
 -------------
