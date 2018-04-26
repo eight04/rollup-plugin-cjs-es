@@ -1,8 +1,11 @@
 const path = require("path");
+
 const {transform: cjsToEs} = require("cjs-es");
 const {transform: cjsHoist} = require("cjs-hoist");
 const mergeSourceMap = require("merge-source-map");
 const {createFilter} = require("rollup-pluginutils");
+
+const {wrapImport, unwrapImport} = require("./lib/transform");
 
 function factory(options = {}) {
   const name = "rollup-plugin-cjs-es";
@@ -54,6 +57,22 @@ function factory(options = {}) {
         return;
       }
       const maps = [];
+      if (options.splitCode) {
+        const result = wrapImport({
+          code,
+          parse: this.parse,
+          splitCode: importee => {
+            if (options.splitCode === "function") {
+              return options.splitCode(id, importee);
+            }
+            return false;
+          }
+        });
+        if (result.touched) {
+          code = result.code;
+          maps.push(result.map);
+        }
+      }
       if (options.hoist) {
         const result = cjsHoist({
           code,
@@ -61,8 +80,10 @@ function factory(options = {}) {
           sourceMap: options.sourceMap,
           ignoreDynamicRequire: options.ignoreDynamicRequire
         });
-        code = result.code;
-        maps.push(result.map);
+        if (result.touched) {
+          code = result.code;
+          maps.push(result.map);
+        }
       }
       const result = cjsToEs({
         code,
@@ -71,14 +92,35 @@ function factory(options = {}) {
         importStyle: requireId => getPreferStyle("import", id, requireId),
         exportStyle: () => getPreferStyle("export", id)
       });
-      code = result.code;
-      maps.push(result.map);
+      if (result.touched) {
+        code = result.code;
+        maps.push(result.map);
+      }
       return {
         code,
-        map: options.sourceMap ? 
+        map: options.sourceMap && maps.length ? 
           (maps.length === 1 ? maps[0] : mergeSourceMap(maps[0], maps[1])) :
           undefined
       };
+    },
+    transformBundle(source, {format}) {
+      if (!options.splitCode) {
+        return;
+      }
+      if (format !== "cjs") {
+        throw new Error("`format` must be 'cjs'");
+      }
+      const result = unwrapImport({
+        code,
+        parse: this.parse,
+        sourceMap: options.sourceMap
+      });
+      if (result.touched) {
+        return {
+          code: result.code,
+          map: result.map
+        };
+      }
     }
   };
 }

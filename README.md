@@ -46,3 +46,66 @@ r("foo");
 ```
 
 These patterns are common in module loaders like UMD. I suggest using other plugin to unwrap the module back to normal CJS pattern.
+
+Lazy load and code splitting
+----------------------------
+
+To lazy load an ES module, we can use `import()` function:
+
+*foo.js*
+```js
+export const foo = () => {
+  return import("./bar");
+};
+```
+
+*bar.js*
+```js
+export const bar = "bar";
+```
+
+After rolluped into CommonJS format, the dist folder would contain two entries:
+
+*foo.js*
+```js
+'use strict';
+
+const foo = () => {
+  return Promise.resolve(require("./bar.js"));
+};
+
+exports.foo = foo;
+```
+
+*bar.js*
+```js
+'use strict';
+
+const bar = "bar";
+
+exports.bar = bar;
+```
+
+So that `bar.js` is not loaded until `require("foo").foo()` is called.
+
+With this plugin, you can use the same feature in CommonJS syntax, by writing the require statement as a promise (`Promise.resolve(require("..."))`):
+
+```js
+module.exports = {
+  foo: () => {
+    return Promise.resolve(require("./bar.js"));
+  }
+};
+```
+
+Or, by adding a special comment `// split` if you can't use async function:
+
+```js
+module.exports = {
+  foo: () => {
+    return require("./bar"); // split
+  }
+};
+```
+
+Note that in the later form, the result is a sync `require` function call, which means **the output format must be `cjs`**.
