@@ -334,6 +334,11 @@ This module exports a single function.
 Changelog
 ---------
 
+* 0.2.0 (Apr 28, 2018)
+
+  - Add: `exportType` option.
+  - Drop: `importStyle`, `exportStyle` option.
+
 * 0.1.0 (Apr 27, 2018)
 
   - Initial releast.
