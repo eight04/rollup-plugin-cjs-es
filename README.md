@@ -1,7 +1,7 @@
 rollup-plugin-cjs-es
 ====================
 
-Convert CommonJS module into ES module. Powered by [cjs-es](https://github.com/eight04/cjs-es) and [cjs-hoist](https://github.com/eight04/cjs-hoist).
+Convert CommonJS module into ES module. Powered by [cjs-es](https://github.com/eight04/cjs-es).
 
 Installation
 ------------
@@ -40,7 +40,7 @@ export default {
 Compatibility
 -------------
 
-`cjs-es` can only transform toplevel `require`, `exports`, and `module.exports` statements. For those non-toplevel statements, the transformer use `cjs-hoist` to hoist them to toplevel (optional, off by default):
+`cjs-es` can transform top-level `require`, `exports`, and `module.exports` statements. For those non-top-level statements, the transformer hoist them to top-level (optional, off by default):
 
 ```js
 const baz = require("foo").bar.baz;
@@ -116,7 +116,7 @@ exports.bar = bar;
 
 So that `bar.js` is not loaded until `require("foo").foo()` is called.
 
-With this plugin, you can use the same feature in CommonJS syntax, by writing the require statement as a promise (`Promise.resolve(require("..."))`):
+With this plugin, you can use the same feature in CommonJS syntax, by writing the require statement inside a promise i.e. `Promise.resolve(require("..."))` (must set `options.dynamicImport` to `true`):
 
 ```js
 module.exports = {
@@ -251,7 +251,7 @@ import foo from "commonjs-proxy:foo";
 foo.bar();
 ```
 
-With this method, it can first look into the `"foo"` module to check its export type, then generate the proxy module which maps named exports into a default export. However, if the required module `"foo"` uses named exports, it have to be converted into a single object then export the single object:
+With this method, it can first look into the `"foo"` module to check its export type, then generate the proxy module which maps named exports into a default export. However, if the required module `"foo"` uses named exports, it has to be converted into a single object:
 
 *commonjs-proxy:foo*
 ```js
@@ -259,7 +259,7 @@ import * as _ from "foo";
 export default _;
 ```
 
-As the result, all named exports are included in the bundle even that only `bar` is used.
+As a result, all named exports are included in the bundle even that only `bar` is used.
 
 The same problem applies to cjs-es as well if you force a module to use default export:
 
