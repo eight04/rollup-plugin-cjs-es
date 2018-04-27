@@ -61,16 +61,22 @@ function factory(options = {}) {
       const maps = [];
       let isTouched;
       if (options.splitCode) {
-        const result = wrapImport({
-          code,
-          parse,
-          shouldSplitCode: importee => {
-            if (typeof options.splitCode === "function") {
-              return options.splitCode(id, importee);
+        let result;
+        try {
+          result = wrapImport({
+            code,
+            parse,
+            shouldSplitCode: importee => {
+              if (typeof options.splitCode === "function") {
+                return options.splitCode(id, importee);
+              }
+              return false;
             }
-            return false;
-          }
-        });
+          });
+        } catch (err) {
+          err.message += ` while transforming ${id}`;
+          throw err;
+        }
         if (result.isTouched) {
           code = result.code;
           maps.push(result.map);
@@ -78,15 +84,21 @@ function factory(options = {}) {
           isTouched = true;
         }
       }
-      const result = cjsEs({
-        code,
-        parse,
-        sourceMap: options.sourceMap,
-        importStyle: requireId => getExportType(requireId, id),
-        exportStyle: () => getExportType(id),
-        hoist: options.hoist,
-        dynamicImport: options.dynamicImport
-      });
+      let result;
+      try {
+        result = cjsEs({
+          code,
+          parse,
+          sourceMap: options.sourceMap,
+          importStyle: requireId => getExportType(requireId, id),
+          exportStyle: () => getExportType(id),
+          hoist: options.hoist,
+          dynamicImport: options.dynamicImport
+        });
+      } catch (err) {
+        err.message += ` while transforming ${id}`;
+        throw err;
+      }
       if (result.isTouched) {
         code = result.code;
         maps.push(result.map);
