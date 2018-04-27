@@ -30,7 +30,6 @@ function factory(options = {}) {
   }
   
   function getExportType(id, importer) {
-    debugger;
     if (!options.exportType) {
       return;
     }

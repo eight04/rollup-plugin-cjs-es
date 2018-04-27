@@ -85,8 +85,6 @@ export default {
   );
   it("function", () => {
     let fooCount = 0;
-    const entryFile = require.resolve(`${__dirname}/fixtures/entry`);
-    const fooFile = require.resolve(`${__dirname}/fixtures/foo`);
     return bundle(
       "entry.js",
       {exportType: (moduleId, importer) => {
@@ -105,6 +103,7 @@ export default {
           }
           return "default";
         }
+        throw new Error(`Unknown moduleId ${moduleId}`);
       }}
     )
       .then(({codes: [entry, foo]}) => {
