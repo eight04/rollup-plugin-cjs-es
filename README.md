@@ -354,6 +354,6 @@ This module exports a single function.
 Changelog
 ---------
 
-* 0.1.0 (?)
+* 0.1.0 (Apr 27, 2018)
 
   - Initial releast.
