@@ -84,37 +84,41 @@ export default {
       })
   );
   it("function", () => {
-    let count = 0;
+    let fooCount = 0;
     const entryFile = require.resolve(`${__dirname}/fixtures/entry`);
     const fooFile = require.resolve(`${__dirname}/fixtures/foo`);
     return bundle(
       "entry.js",
       {exportType: (moduleId, importer) => {
-        let type;
-        if (count == 0) {
-          assert.equal(moduleId, entryFile);
-          assert(!importer);
-          type = "named";
-        } else {
-          assert.equal(moduleId, fooFile);
-          assert.equal(importer, entryFile);
-          type = "default";
+        if (moduleId.endsWith("entry.js")) {
+          assert(!importer); // no importer for entry.
+          return "named";
         }
-        count++;
-        return type;
+        if (moduleId.endsWith("foo.js")) {
+          fooCount++;
+          if (fooCount === 1) {
+            assert(importer.endsWith("entry.js")); // required by entry.js
+          } else if (fooCount === 2) {
+            assert(!importer); // no importer when trasnforming exports.
+          } else {
+            throw new Error(`foo is required ${fooCount} times`);
+          }
+          return "default";
+        }
       }}
     )
       .then(({codes: [entry, foo]}) => {
         assert(entry.includes(entryImportDefault));
         assert(entry.includes(entryExportNamed));
         assert(foo.includes(fooExportDefault));
+        assert.equal(fooCount, 2);
       });
   });
   it("object map", () =>
     bundle("entry.js", 
       {exportType: {
-        "test/fixtures/foo": "default",
-        "test/fixtures/entry": "named"
+        "./test/fixtures/foo": "default",
+        "./test/fixtures/entry": "named"
       }}
     )
       .then(({codes: [entry, foo]}) => {

@@ -3,6 +3,7 @@ const path = require("path");
 const {transform: cjsEs} = require("cjs-es");
 const mergeSourceMap = require("merge-source-map");
 const {createFilter} = require("rollup-pluginutils");
+const resolve = require("resolve");
 
 const {wrapImport, unwrapImport} = require("./lib/transform");
 
@@ -18,38 +19,31 @@ function factory(options = {}) {
   let isImportWrapped = false;
   let parse = null;
   
-  // normalize map key to absolute path
-  [options.importStyle, options.exportStyle].forEach(map => {
-    if (typeof map === "object") {
-      for (const key of Object.keys(map)) {
-        const newKey = require.resolve(path.resolve(key));
-        if (newKey !== key) {
-          map[newKey] = map[key];
-          delete map[key];
-        }
+  if (typeof options.exportType === "object") {
+    for (const key of Object.keys(options.exportType)) {
+      const newKey = resolve.sync(key, {basedir: process.cwd()});
+      if (newKey !== key) {
+        options.exportType[newKey] = options.exportType[key];
+        delete options.exportType[key];
       }
     }
-  });
+  }
   
-  function getPreferStyle(type, id, requireId) {
-    const preferStyle = options[type + "Style"];
-    if (typeof preferStyle === "string") {
-      return preferStyle;
+  function getExportType(id, importer) {
+    debugger;
+    if (!options.exportType) {
+      return;
     }
-    if (typeof preferStyle === "function") {
-      return preferStyle(id, requireId);
+    if (typeof options.exportType === "string") {
+      return options.exportType;
     }
-    if (typeof preferStyle === "object") {
-      if (typeof preferStyle[id] === "string") {
-        return preferStyle[id];
-      }
-      if (typeof preferStyle[id] === "function") {
-        return preferStyle[id](requireId);
-      }
-      if (typeof preferStyle[id] === "object") {
-        return preferStyle[id][requireId];
-      }
+    if (importer) {
+      id = resolve.sync(id, {
+        basedir: path.dirname(importer)
+      });
     }
+    return typeof options.exportType === "function" ?
+      options.exportType(id, importer) : options.exportType[id];
   }
   
   if (options.sourceMap == null) {
@@ -89,8 +83,8 @@ function factory(options = {}) {
         code,
         parse,
         sourceMap: options.sourceMap,
-        importStyle: requireId => getPreferStyle("import", id, requireId),
-        exportStyle: () => getPreferStyle("export", id),
+        importStyle: requireId => getExportType(requireId, id),
+        exportStyle: () => getExportType(id),
         hoist: options.hoist,
         dynamicImport: options.dynamicImport
       });
