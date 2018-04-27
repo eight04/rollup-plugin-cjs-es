@@ -11,7 +11,7 @@ function bundle(file, options) {
     plugins: [
       cjsToEs(options),
       {transform(code) {
-        codes.push(code);
+        codes.push(code.replace(/\r/g, ""));
       }}
     ],
     experimentalCodeSplitting: true,
@@ -26,10 +26,12 @@ function bundle(file, options) {
     .then(bundleResult => ({codes, bundleResult}));
 }
 
-function test(file, options, expect) {
+function test(file, options, ...expects) {
   return bundle(file, options)
-    .then(({codes: [code]}) => {
-      assert.equal(code.replace(/\r/g, ""), expect);
+    .then(({codes}) => {
+      while (expects.length) {
+        assert.equal(codes.shift(), expects.shift());
+      }
     });
 }
 
@@ -37,79 +39,89 @@ function readFixture(file) {
   return fs.readFileSync(`${__dirname}/fixtures/${file}`, "utf8").replace(/\r/g, "");
 }
 
-describe("importStyle", () => {
+describe("import", () => {
   it("normal", () => test("import.js", undefined, 'import * as foo from "foo";'));
   it("default comment", () =>
     test("import-default.js", undefined, 'import foo from "foo"; // default')
   );
-  it("string", () => 
-    test("import.js", {importStyle: "default"}, 'import foo from "foo";')
-  );
-  it("function", () => 
-    test(
-      "import.js",
-      {importStyle: (importer, importee) => {
-        assert(importer.endsWith("import.js"));
-        assert.equal(importee, "foo");
-        return "default";
-      }},
-      'import foo from "foo";'
-    )
-  );
-  it("map", () =>
-    test(
-      "import.js",
-      {importStyle: {
-        [`${__dirname}/fixtures/import.js`]: "default"
-      }},
-      'import foo from "foo";'
-    )
-  );
-  it("map with function", () => 
-    test(
-      "import.js",
-      {importStyle: {
-        [`${__dirname}/fixtures/import.js`]: importee => {
-          assert.equal(importee, "foo");
-          return "default";
-        }
-      }},
-      'import foo from "foo";'
-    )
-  );
-  it("map with map", () => 
-    test(
-      "import.js",
-      {importStyle: {
-        [`${__dirname}/fixtures/import.js`]: {
-          "foo": "default"
-        }
-      }},
-      'import foo from "foo";'
-    )
-  );
 });
 
-describe("exportStyle", () => {
+describe("export", () => {
   it("normal", () => test("export.js", undefined, "export {foo};"));
   it("default comment", () =>
     test("export-default.js", undefined, "export default {foo}; // default")
   );
-  it("string", () =>
-    test("export.js", {exportStyle: "default"}, "export default {foo};")
+});
+
+describe("exportType", () => {
+  const entryImportNamed = 'import * as foo from "./foo"';
+  const entryImportDefault = 'import foo from "./foo"';
+  const entryExportNamed = "export {foo}";
+  const entryExportDefault = "export default {foo}";
+  const fooExportNamed = `
+const _export_foo_ = () => console.log("foo");
+export {_export_foo_ as foo};
+  `.trim();
+  const fooExportDefault = `
+export default {
+  foo: () => console.log("foo")
+};
+  `.trim();
+  it("named", () => 
+    bundle("entry.js", {exportType: "named"})
+      .then(({codes: [entry, foo]}) => {
+        assert(entry.includes(entryImportNamed));
+        assert(entry.includes(entryExportNamed));
+        assert(foo.includes(fooExportNamed));
+      })
   );
-  it("function", () =>
-    test("export.js", {exportStyle: exporter => {
-      assert(exporter.endsWith("export.js"));
-      return "default";
-    }}, "export default {foo};")
+  it("default", () =>
+    bundle("entry.js", {exportType: "default"})
+      .then(({codes: [entry, foo]}) => {
+        assert(entry.includes(entryImportDefault));
+        assert(entry.includes(entryExportDefault));
+        assert(foo.includes(fooExportDefault));
+      })
   );
-  it("map", () => 
-    test("export.js", {
-      exportStyle: {
-        [`${__dirname}/fixtures/export.js`]: "default"
-      }
-    }, "export default {foo};")
+  it("function", () => {
+    let count = 0;
+    const entryFile = require.resolve(`${__dirname}/fixtures/entry`);
+    const fooFile = require.resolve(`${__dirname}/fixtures/foo`);
+    return bundle(
+      "entry.js",
+      {exportType: (moduleId, importer) => {
+        let type;
+        if (count == 0) {
+          assert.equal(moduleId, entryFile);
+          assert(!importer);
+          type = "named";
+        } else {
+          assert.equal(moduleId, fooFile);
+          assert.equal(importer, entryFile);
+          type = "default";
+        }
+        count++;
+        return type;
+      }}
+    )
+      .then(({codes: [entry, foo]}) => {
+        assert(entry.includes(entryImportDefault));
+        assert(entry.includes(entryExportNamed));
+        assert(foo.includes(fooExportDefault));
+      });
+  });
+  it("object map", () =>
+    bundle("entry.js", 
+      {exportType: {
+        "test/fixtures/foo": "default",
+        "test/fixtures/entry": "named"
+      }}
+    )
+      .then(({codes: [entry, foo]}) => {
+        assert(entry.includes(entryImportDefault));
+        assert(entry.includes(entryExportNamed));
+        assert(foo.includes(fooExportDefault));
+      })
   );
 });
 
