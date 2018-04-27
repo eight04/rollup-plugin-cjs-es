@@ -28,8 +28,7 @@ export default {
     cjsEs({
       include: ["*.js"],
       exclude: [],
-      importStyle: "default",
-      exportStyle: "default",
+      exportType: "default",
       sourceMap: true,
       splitCode: true,
       hoist: true,
@@ -169,9 +168,7 @@ entry.js (2:0)
    ^
 ```
 
-To fix it, [mark the require as `// default`](https://github.com/eight04/cjs-es#import-style) or use the `importStyle` option.
-
-However, adding comments manually could be a problem if they are mixed everywhere. In this case, you may want to set both `importStyle` and `exportStyle` to `"default"` so the plugin uses default import/export everywhere.
+To fix it, [mark the require as `// default`](https://github.com/eight04/cjs-es#import-style), or use `exportType` option to tell the plugin that *foo.js* uses default export.
 
 ### Dynamic import() problem with default export
 
@@ -286,7 +283,7 @@ const _export_foo_ = () => console.log("foo");
 _export_foo_();
 ```
 
-*bundled with `importStyle: "default"` and `exportStyle: "default"`*
+*bundled with `exportType: "default"`*
 ```js
 var foo = {
   foo: () => console.log("foo"),
@@ -313,7 +310,7 @@ This module exports a single function.
   If `splitCode` is a function, it would receives 2 arguments:
   
   - `importer`: `string`. The module ID which is being transformed. It is usually an absolute path.
-  - `importee`: `string`. The id inside `require()` function.
+  - `importee`: `string`. The require ID inside `require()` function.
   
   The return value should be a `boolean`.
   
@@ -321,35 +318,16 @@ This module exports a single function.
   
 * `hoist`: `boolean`. If true then enable [hoist transformer](https://github.com/eight04/cjs-es#hoist). Default: `false`.
 * `dynamicImport`: `boolean`. If true then enable [dynamic import transformer](https://github.com/eight04/cjs-es#dynamic-import). Default: `false`.
-* `importStyle`: `string|object|function`. Change the importStyle option for cjs-es.
+* `exportType`: `string|object|function`. Tell the plugin what type of the export does the module use.
 
-  If `importStyle` is a function, it receives 2 arguments:
+  If `exportType` is a function, it receives 2 arguments:
   
-  - `importer`: `string`. The module ID which is being transformed.
-  - `importee`: `string`. The id inside `require()` function.
+  - `modulId`: `string`. The ID of the module.
+  - `importer`: `null|string`. If the module is imported by an importer, this would be the ID of the importer module.
   
-  The return value should be `"named"` or `"default"`.
+  The return value should be the type of export for `moduleId`.
   
-  If `importStyle` is an object, it is a 2 depth map. For example:
-  
-  ```js
-  importStyle: {
-    "path/to/moduleA": "default", // set importStyle to "default" for moduleA
-    "path/to/moduleB": {
-      "./foo": "default" // set importStyle to "default" for moduleB and 
-    }                    // only when requiring `./foo` module.
-  }
-  ```
-
-  Default: `"named"`.
-  
-* `exportStyle`: `string|object|function`. Change the exportStyle option for cjs-es.
-
-  If `exportStyle` is a function, it receives 1 argument:
-  
-  - `exporter`: `string`. The module ID which is being transformed.
-  
-  If `exportStyle` is an object, it is a `"path/to/module": "value"` map.
+  If `exportType` is an object, it is a `"path/to/module": type` map.
   
   Default: `"named"`.
 
