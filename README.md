@@ -1,6 +1,8 @@
 rollup-plugin-cjs-es
 ====================
 
+[![Build Status](https://travis-ci.org/eight04/rollup-plugin-cjs-es.svg?branch=master)](https://travis-ci.org/eight04/rollup-plugin-cjs-es)
+
 Convert CommonJS module into ES module. Powered by [cjs-es](https://github.com/eight04/cjs-es).
 
 Installation
