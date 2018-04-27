@@ -1,6 +1,6 @@
 {
   "name": "rollup-plugin-cjs-es",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Convert CommonJS module into ES module",
   "keywords": [
     "rollup-plugin",
@@ -10,7 +10,9 @@
     "transform"
   ],
   "main": "index.js",
-  "files": ["lib"],
+  "files": [
+    "lib"
+  ],
   "scripts": {
     "test": "eslint **/*.js && mocha",
     "preversion": "npm test",
