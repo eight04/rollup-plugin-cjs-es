@@ -74,8 +74,9 @@ function factory(options = {}) {
             }
           });
         } catch (err) {
-          err.message += ` while transforming ${id}`;
-          throw err;
+          const pos = err.node ? err.node.start : null;
+          this.error(err, pos);
+          return;
         }
         if (result.isTouched) {
           code = result.code;
@@ -96,8 +97,9 @@ function factory(options = {}) {
           dynamicImport: options.dynamicImport
         });
       } catch (err) {
-        err.message += ` while transforming ${id}`;
-        throw err;
+        const pos = err.node ? err.node.start : null;
+        this.error(err, pos);
+        return;
       }
       if (result.isTouched) {
         code = result.code;
