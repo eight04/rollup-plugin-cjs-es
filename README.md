@@ -334,6 +334,11 @@ This module exports a single function.
 Changelog
 ---------
 
+* 0.2.1 (Apr 28, 2018)
+
+  - Update cjs-es to 0.3.2.
+  - Add: include pos while reporting errors.
+
 * 0.2.0 (Apr 28, 2018)
 
   - Add: `exportType` option.
