@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "cjs-es": "^0.3.2",
+    "es-info": "^0.1.1",
     "estree-walker": "^0.5.1",
     "magic-string": "^0.24.0",
     "merge-source-map": "^1.1.0",
