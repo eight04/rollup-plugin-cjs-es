@@ -14,7 +14,8 @@
     "lib"
   ],
   "scripts": {
-    "test": "eslint **/*.js && mocha",
+    "test": "eslint **/*.js && nyc --reporter=html mocha",
+    "coverage": "nyc report --reporter=text-lcov | coveralls",
     "preversion": "npm test",
     "postversion": "git push --follow-tags && npm publish"
   },
@@ -22,8 +23,10 @@
   "author": "eight04 <eight04@gmail.com>",
   "license": "MIT",
   "devDependencies": {
+    "coveralls": "^3.0.0",
     "eslint": "^4.19.1",
     "mocha": "^5.1.1",
+    "nyc": "^11.7.1",
     "rollup": "^0.58.2"
   },
   "dependencies": {
