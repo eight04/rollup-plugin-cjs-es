@@ -141,33 +141,68 @@ Note that in the later form, the result is a sync `require` function call, which
 Named import/export v.s. default import/export
 ----------------------------------------------
 
-### Cannot call a namespace
+### Missing exports: foo is not exported by foo.js
 
-In the following example, you would get an error:
+In the following example, you would get a warning:
 
 *entry.js*
 ```js
 const foo = require("./foo");
-foo();
+foo.foo();
 ```
 
 *foo.js*
 ```js
-module.exports = function() {
-  console.log("foo");
+const myObject = {
+  foo: () => console.log("foo");
 };
+// assign the entire object so that cjs-es won't convert the object pattern into named exports.
+module.exports = myObject;
 ```
 
 ```
-entry.js → dist...
-[!] Error: Cannot call a namespace ('foo')
-entry.js (2:0)
-1: const foo = require("./foo");
-2: foo();
-   ^
+(!) Missing exports
+https://github.com/rollup/rollup/wiki/Troubleshooting#name-is-not-exported-by-mo
+dule
+entry.js
+foo is not exported by foo.js
+1: import * as foo from "./foo";
+2: foo.foo();
+       ^
 ```
 
-To fix it, [mark the require as `// default`](https://github.com/eight04/cjs-es#import-style), or use `exportType` option to tell the plugin that *foo.js* uses default export.
+> Although the bundle is created, it is unusable in this case.
+
+That is because cjs-es tends to import named export by default. To fix it, [mark the require as `// default`](https://github.com/eight04/cjs-es#import-style), or use `exportType` option to tell the plugin that *foo.js* exports default member:
+
+```js
+{
+  plugins: [
+    cjsEs({
+      exportType: {
+        "path/to/foo.js": "default"
+      }
+    })  
+  ]
+}
+```
+
+When there are bunch of these warnings, manually adding those modules into `exportType` could be a problem. Therefore, you might want to dump the information about all modules with other plugins e.g. [rollup-plugin-es-info](https://github.com/eight04/rollup-plugin-es-info) then convert it into a `exportType` map.
+
+If you don't care about tree-shaking feature (tree-shaking only works with named exports), you can simply set `options.exportType` to `"default"` so that every modules use default member when importing/exporting:
+
+```js
+{
+  plugins: [
+    resolve({
+      module: false // don't resolve to ES modules since they may export named members.
+    }),
+    cjsEs({
+      exportType: "default"
+    })
+  ]
+}
+```
 
 ### Dynamic import() problem with default export
 
@@ -232,9 +267,9 @@ nction
 
 Avoid default export if you want to use dynamic `import()` + CommonJS in the same time.
 
-### rollup-plugin-commonjs
+### Comparing to rollup-plugin-commonjs
 
-The [commonjs](https://github.com/rollup/rollup-plugin-commonjs) plugin uses a smart method to determine whether to use named or default import. It creates a proxy loader when a module is imported:
+[rollup-plugin-commonjs](https://github.com/rollup/rollup-plugin-commonjs) uses a smart method to determine whether to use named or default import. It creates a proxy loader when a module is imported:
 
 *source*
 ```js
