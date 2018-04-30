@@ -116,24 +116,17 @@ function factory(options = {}) {
       const maps = [];
       let isTouched;
       if (options.splitCode) {
-        let result;
-        try {
-          result = wrapImport({
-            code,
-            parse,
-            ast,
-            shouldSplitCode: importee => {
-              if (typeof options.splitCode === "function") {
-                return options.splitCode(id, importee);
-              }
-              return false;
+        const result = wrapImport({
+          code,
+          parse,
+          ast,
+          shouldSplitCode: importee => {
+            if (typeof options.splitCode === "function") {
+              return options.splitCode(id, importee);
             }
-          });
-        } catch (err) {
-          const pos = err.node ? err.node.start : null;
-          this.error(err, pos);
-          return;
-        }
+            return false;
+          }
+        });
         if (result.isTouched) {
           code = result.code;
           maps.push(result.map);
