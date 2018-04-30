@@ -6,7 +6,8 @@ const mergeSourceMap = require("merge-source-map");
 const {createFilter} = require("rollup-pluginutils");
 const esInfo = require("es-info");
 const nodeResolve = promisify(require("resolve"));
-const {wrapImport, unwrapImport} = require("./lib/transform");
+const {wrapImport} = require("./lib/wrap-import");
+const {unwrapImport} = require("./lib/unwrap-import");
 
 function joinMaps(maps) {
   while (maps.length > 1) {
