@@ -367,6 +367,13 @@ This module exports a single function.
 Changelog
 ---------
 
+* 0.3.0 (May 1, 2018)
+
+  - Update cjs-es to 0.4.4.
+  - Add: warn users for unconverted require.
+  - Add: `options.nested`.
+  - **Drop: `options.hoist` and `options.dynamicImport`.**
+
 * 0.2.1 (Apr 28, 2018)
 
   - Update cjs-es to 0.3.2.
