@@ -31,8 +31,7 @@ export default {
       exportType: "default",
       sourceMap: true,
       splitCode: true,
-      hoist: true,
-      dynamicImport: true
+      nested: true
     })
   ]
 };
@@ -117,7 +116,7 @@ exports.bar = bar;
 
 So that `bar.js` is not loaded until `require("foo").foo()` is called.
 
-With this plugin, you can use the same feature in CommonJS syntax, by writing the require statement inside a promise i.e. `Promise.resolve(require("..."))` (must set `options.dynamicImport` to `true`):
+With this plugin, you can use the same feature in CommonJS syntax, by writing the require statement inside a promise i.e. `Promise.resolve(require("..."))`:
 
 ```js
 module.exports = {
