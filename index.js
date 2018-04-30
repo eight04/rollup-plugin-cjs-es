@@ -148,7 +148,10 @@ function factory(options = {}) {
         sourceMap: options.sourceMap,
         importStyle: requireId => getExportType(requireId, id),
         exportStyle: () => getExportType(id),
-        nested: options.nested
+        nested: options.nested,
+        warn: (message, pos) => {
+          this.warn(message, pos);
+        }
       })
         .then(result => {
           if (result.isTouched) {
