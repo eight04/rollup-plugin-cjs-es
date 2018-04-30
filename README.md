@@ -368,6 +368,10 @@ This module exports a single function.
 Changelog
 ---------
 
+* 0.3.1 (May 1, 2018)
+
+  - Fix: scope is not correctly analyzed in splitCodeTransformer.
+
 * 0.3.0 (May 1, 2018)
 
   - Update cjs-es to 0.4.4.
