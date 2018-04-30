@@ -128,7 +128,7 @@ export default {
   );
 });
 
-describe("hoist", () => {
+describe("nested", () => {
   const orig = readFixture("import-anywhere.js");
   const hoisted = `
 import * as _require_foo_ from "foo";
@@ -137,24 +137,19 @@ if (foo) {
 }
   `.trim();
   
-  it("normal", () => test("import-anywhere.js", undefined, orig));
-  it("hoist", () => test("import-anywhere.js", {hoist: true}, hoisted));
+  it("false", () => test("import-anywhere.js", undefined, orig));
+  it("true", () => test("import-anywhere.js", {nested: true}, hoisted));
 });
 
-describe("hoist dynamicImport", () => {
+describe("nested dynamicImport", () => {
   const orig = readFixture("import-dynamic.js");
-  const hoisted = `
-import * as _require_foo_ from "foo";
-Promise.resolve(_require_foo_).then(bar);
-  `.trim();
   const dynamic = `
 import("foo").then(bar);
   `.trim();
   
-  it("normal", () => test("import-dynamic.js", undefined, orig));
-  it("hoist", () => test("import-dynamic.js", {hoist: true}, hoisted));
-  it("hoist + dynamic", () =>
-    test("import-dynamic.js", {hoist: true, dynamicImport: true}, dynamic)
+  it("false", () => test("import-dynamic.js", undefined, orig));
+  it("true", () =>
+    test("import-dynamic.js", {nested: true}, dynamic)
   );
 });
 
@@ -169,7 +164,7 @@ describe("splitCode", () => {
     })
   );
   it("hoist", () =>
-    bundle("split-code-a.js", {hoist: true}).then(({bundleResult}) => {
+    bundle("split-code-a.js", {nested: true}).then(({bundleResult}) => {
       assert.equal(Object.keys(bundleResult).length, 1);
       const module = bundleResult["split-code-a.js"];
       assert(module);
@@ -178,7 +173,7 @@ describe("splitCode", () => {
     })
   );
   it("splitCode", () =>
-    bundle("split-code-a.js", {hoist: true, splitCode: true}).then(({bundleResult}) => {
+    bundle("split-code-a.js", {nested: true, splitCode: true}).then(({bundleResult}) => {
       assert.equal(Object.keys(bundleResult).length, 2);
       const moduleA = bundleResult["split-code-a.js"];
       assert(moduleA);

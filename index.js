@@ -1,11 +1,11 @@
 const path = require("path");
+const {promisify} = require("util");
 
 const {transform: cjsEs} = require("cjs-es");
 const mergeSourceMap = require("merge-source-map");
 const {createFilter} = require("rollup-pluginutils");
-const resolve = require("resolve");
 const esInfo = require("es-info");
-
+const nodeResolve = promisify(require("resolve"));
 const {wrapImport, unwrapImport} = require("./lib/transform");
 
 function joinMaps(maps) {
@@ -23,15 +23,50 @@ function isEsModule(ast) {
     result.export.all;
 }
 
+function createResolve(rollupOptions) {
+  return (importee, importer) => {
+    return new Promise((resolve, reject) => {
+      const plugins = rollupOptions.plugins || [];
+      resolveId(0);
+      function resolveId(i) {
+        if (i >= plugins.length) {
+          const basedir = path.dirname(importer);
+          nodeResolve(importee, {basedir})
+            .then(resolve, reject);
+          return;
+        }
+        if (!plugins[i].resolveId) {
+          setImmediate(resolveId, i + 1);
+          return;
+        }
+        let pending;
+        try {
+          pending = Promise.resolve(plugins[i].resolveId(importee, importer));
+        } catch (err) {
+          reject(err);
+          return;
+        }
+        pending
+          .then(result => {
+            if (result) {
+              resolve(result);
+              return;
+            }
+            setImmediate(resolveId, i + 1);
+          })
+          .catch(reject);
+      }
+    });
+  };  
+}
+
 function factory(options = {}) {
   let isImportWrapped = false;
   let parse = null;
+  const rollupOptions = {};
   
   if (!options.resolve) {
-    options.resolve = (importee, importer) =>
-      resolve.sync(importee, {
-        basedir: path.dirname(importer)
-      });
+    options.resolve = createResolve(rollupOptions);
   }
   
   if (typeof options.exportType === "object") {
@@ -50,11 +85,11 @@ function factory(options = {}) {
     if (typeof options.exportType === "string") {
       return options.exportType;
     }
-    if (importer) {
-      id = options.resolve(id, importer);
-    }
-    return typeof options.exportType === "function" ?
-      options.exportType(id, importer) : options.exportType[id];
+    return Promise.resolve(importer ? options.resolve(id, importer) : id)
+      .then(id => {
+        return typeof options.exportType === "function" ?
+          options.exportType(id, importer) : options.exportType[id];
+      });
   }
   
   if (options.sourceMap == null) {
@@ -65,6 +100,9 @@ function factory(options = {}) {
   
 	return {
     name: "rollup-plugin-cjs-es",
+    options(_rollupOptions) {
+      Object.assign(rollupOptions, _rollupOptions);
+    },
     transform(code, id) {
       if (!filter(id)) {
         return;
@@ -103,35 +141,29 @@ function factory(options = {}) {
           ast = null;
         }
       }
-      let result;
-      try {
-        result = cjsEs({
-          code,
-          parse,
-          ast,
-          sourceMap: options.sourceMap,
-          importStyle: requireId => getExportType(requireId, id),
-          exportStyle: () => getExportType(id),
-          hoist: options.hoist,
-          dynamicImport: options.dynamicImport
+      return cjsEs({
+        code,
+        parse,
+        ast,
+        sourceMap: options.sourceMap,
+        importStyle: requireId => getExportType(requireId, id),
+        exportStyle: () => getExportType(id),
+        nested: options.nested
+      })
+        .then(result => {
+          if (result.isTouched) {
+            code = result.code;
+            maps.push(result.map);
+            isTouched = true;
+            ast = null;
+          }
+          if (isTouched) {
+            return {
+              code,
+              map: options.sourceMap && maps.length && joinMaps(maps)
+            };
+          }
         });
-      } catch (err) {
-        const pos = err.node ? err.node.start : null;
-        this.error(err, pos);
-        return;
-      }
-      if (result.isTouched) {
-        code = result.code;
-        maps.push(result.map);
-        isTouched = true;
-        ast = null;
-      }
-      if (isTouched) {
-        return {
-          code,
-          map: options.sourceMap && maps.length && joinMaps(maps)
-        };
-      }
     },
     transformBundle(code, {format}) {
       if (!isImportWrapped) {
