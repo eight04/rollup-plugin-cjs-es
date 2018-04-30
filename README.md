@@ -350,8 +350,7 @@ This module exports a single function.
   
   Default: `false`
   
-* `hoist`: `boolean`. If true then enable [hoist transformer](https://github.com/eight04/cjs-es#hoist). Default: `false`.
-* `dynamicImport`: `boolean`. If true then enable [dynamic import transformer](https://github.com/eight04/cjs-es#dynamic-import). Default: `false`.
+* `nested?`: `boolean`. If true then analyze the AST recursively, otherwise only top-level nodes are analyzed. Default: `false`.
 * `exportType`: `string|object|function`. Tell the plugin what type of the export does the module use.
 
   If `exportType` is a function, it receives 2 arguments:
