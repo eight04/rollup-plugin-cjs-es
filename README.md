@@ -368,6 +368,10 @@ This module exports a single function.
 Changelog
 ---------
 
+* 0.3.2 (May 4, 2018)
+
+  - Fix: `TypeError: cannot access property 'name' on undefined` in unwrapImport.
+
 * 0.3.1 (May 1, 2018)
 
   - Fix: scope is not correctly analyzed in splitCodeTransformer.
