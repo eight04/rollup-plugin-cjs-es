@@ -328,6 +328,8 @@ var foo = {
 foo.foo();
 ```
 
+> Note that this won't be true after rollup supports tree-shaking for object literal. See https://github.com/rollup/rollup/issues/2201
+
 API reference
 -------------
 
