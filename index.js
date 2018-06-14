@@ -4,7 +4,7 @@ const {promisify} = require("util");
 const {transform: cjsEs} = require("cjs-es");
 const mergeSourceMap = require("merge-source-map");
 const {createFilter} = require("rollup-pluginutils");
-const esInfo = require("es-info");
+const {analyze: esInfoAnalyze} = require("es-info");
 const nodeResolve = promisify(require("resolve"));
 const {wrapImport} = require("./lib/wrap-import");
 const {unwrapImport} = require("./lib/unwrap-import");
@@ -16,8 +16,7 @@ function joinMaps(maps) {
   return maps[0];
 }
 
-function isEsModule(ast) {
-  const result = esInfo.analyze(ast);
+function isEsModule(result) {
   return Object.keys(result.import).length ||
     result.export.default ||
     result.export.named.length ||
@@ -65,6 +64,7 @@ function factory(options = {}) {
   let isImportWrapped = false;
   let parse = null;
   const rollupOptions = {};
+  const exportTable = {};
   
   if (!options.resolve) {
     options.resolve = createResolve(rollupOptions);
@@ -79,17 +79,27 @@ function factory(options = {}) {
     options.exportType = newMap;
   }
   
-  function getExportType(id, importer) {
+  function getExportTypeFromOptions(id) {
     if (!options.exportType) {
       return;
     }
     if (typeof options.exportType === "string") {
       return options.exportType;
     }
-    return Promise.resolve(importer ? options.resolve(id, importer) : id)
-      .then(id => {
-        return typeof options.exportType === "function" ?
-          options.exportType(id, importer) : options.exportType[id];
+    return typeof options.exportType === "function" ?
+      options.exportType(id) : options.exportType[id];
+  }
+  
+  function getExportTypeFromTable(id) {
+    if (exportTable[id]) {
+      return exportTable[id].named ? "named" : "default";
+    }
+  }
+  
+  function getExportType(id) {
+    return Promise.resolve(getExportTypeFromOptions(id))
+      .then(result => {
+        return result ? result : getExportTypeFromTable(id);
       });
   }
   
@@ -98,6 +108,38 @@ function factory(options = {}) {
   }
   
   const filter = createFilter(options.include, options.exclude);
+  
+  function checkExportTable(id, context, info, trusted = false) {
+    if (exportTable[id]) {
+      if (exportTable[id].export.default && !info.export.default) {
+        context.warn(`${id} doesn't export default expected by ${exportTable[id].expectBy}`);
+      }
+      if (exportTable[id].export.named && !info.export.named.length) {
+        context.warn(`${id} doesn't export names expected by ${exportTable[id].expectBy}`);
+      }
+    }
+    if (!exportTable[id] || !exportTable[id].trusted) {
+      exportTable[id] = {
+        default: info.default,
+        named: info.named.length > 0,
+        expectBy: id,
+        trusted
+      };
+    }
+  }
+  
+  function updateExportTable({id, code, context, info}) {
+    if (!info) {
+      info = esInfoAnalyze(context.parse(code))
+    }
+    checkExportTable(id, context, info, true);
+    for (const [name, importInfo] of Object.entries(info.import)) {
+      context.resolveId(name, id)
+        .then(newId => {
+          checkExportTable(newId, context, importInfo);
+        });
+    }
+  }
   
 	return {
     name: "rollup-plugin-cjs-es",
@@ -110,7 +152,9 @@ function factory(options = {}) {
       }
       parse = this.parse;
       let ast = parse(code);
-      if (isEsModule(ast)) {
+      const info = esInfoAnalyze(ast);
+      if (isEsModule(info)) {
+        setTimeout(updateExportTable, 0, {context: this, info, id});
         return;
       }
       const maps = [];
@@ -140,7 +184,9 @@ function factory(options = {}) {
         parse,
         ast,
         sourceMap: options.sourceMap,
-        importStyle: requireId => getExportType(requireId, id),
+        importStyle: requireId => 
+          this.resolveId(requireId, id)
+            .then(getExportType),
         exportStyle: () => getExportType(id),
         nested: options.nested,
         warn: (message, pos) => {
@@ -155,6 +201,7 @@ function factory(options = {}) {
             ast = null;
           }
           if (isTouched) {
+            setTimeout(updateExportTable, 0, {context: this, code, id})
             return {
               code,
               map: options.sourceMap && maps.length && joinMaps(maps)
