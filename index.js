@@ -106,42 +106,56 @@ function factory(options = {}) {
       });
   }
   
-  function checkExportTable(id, context, info, trusted = false, expectBy = id) {
-    if (exportTable[id]) {
-      if (exportTable[id].default && !info.default) {
-        warn(id, exportTable[id].expectBy, "default");
-      }
-      if (exportTable[id].named && !info.named.length && !info.all) {
-        warn(id, exportTable[id].expectBy, "names");
-      }
-    }
-    if (!exportTable[id] || !exportTable[id].trusted) {
-      exportTable[id] = {
-        default: info.default,
-        named: info.named.length > 0 || info.all,
-        expectBy,
-        trusted
-      };
-    }
-    
-    function warn(id, expectBy, type) {
-      id = path.relative(".", id);
-      expectBy = path.relative(".", expectBy);
-      context.warn(`${id} doesn't export ${type} expected by ${expectBy}`);
-    }
-  }
-  
   function updateExportTable({id, code, context, info}) {
     if (!info) {
       info = esInfoAnalyze(context.parse(code));
     }
-    checkExportTable(id, context, info.export, true);
+    if (exportTable[id]) {
+      if (exportTable[id].default && !info.export.default) {
+        warnExport("default");
+      }
+      if (exportTable[id].named && !info.export.named.length && !info.export.all) {
+        warnExport("names");
+      }
+    }
+    exportTable[id] = {
+      default: info.default,
+      named: info.export.named.length > 0 || info.all,
+      expectBy: id,
+      trusted: true
+    };
     return Promise.all(Object.entries(info.import).map(([name, importInfo]) => {
       return context.resolveId(name, id)
-        .then(newId => {
-          checkExportTable(newId, context, importInfo, false, id);
+        .then(importee => {
+          if (exportTable[importee]) {
+            if (exportTable[importee].default && !importInfo.default) {
+              warnImport(importee, "default");
+            }
+            if (exportTable[importee].named && !importInfo.named.length && !importInfo.all) {
+              warnImport(importee, "names");
+            }
+          } else {
+            exportTable[importee] = {
+              default: importInfo.default,
+              named: importInfo.named.length > 0 || importInfo.all,
+              expectBy: id
+            };
+          }
         });
     }));
+    
+    function warnImport(importee, type) {
+      const shortId = path.relative(".", id);
+      const shortImportee = path.relative(".", importee);
+      const expectBy = path.relative(".", exportTable[importee].expectBy);
+      context.warn(`${expectBy} think ${shortImportee} export ${type} but ${shortId} disagreed`);
+    }
+    
+    function warnExport(type) {
+      const shortId = path.relative(".", id);
+      const expectBy = path.relative(".", exportTable[id].expectBy);
+      context.warn(`${shortId} doesn't export ${type} expected by ${expectBy}`);
+    }
   }
   
 	return {
