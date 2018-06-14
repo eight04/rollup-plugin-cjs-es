@@ -134,7 +134,7 @@ describe("export table", () => {
     bundle("export-type-unmatched").then(({warns}) => {
       warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
       assert.equal(warns.length, 1);
-      assert(/foo\.js doesn't export names expected by.+?entry\.js/.test(warns[0].message));
+      assert(/foo\.js' doesn't export names expected by.+?entry\.js/.test(warns[0].message));
     })
   );
   
@@ -142,7 +142,23 @@ describe("export table", () => {
     bundle("export-type-unmatched-default").then(({warns}) => {
       warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
       assert.equal(warns.length, 1);
-      assert(/foo\.js doesn't export default expected by.+?entry\.js/.test(warns[0].message));
+      assert(/foo\.js' doesn't export default expected by.+?entry\.js/.test(warns[0].message));
+    })
+  );
+  
+  it("export type disagree", () =>
+    bundle("export-type-disagree").then(({warns}) => {
+      warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
+      assert.equal(warns.length, 1);
+      assert(/entry\.js' thinks 'external' export names but.+?foo\.js' disagrees/.test(warns[0].message));
+    })
+  );
+  
+  it("export type disagree default", () =>
+    bundle("export-type-disagree-default").then(({warns}) => {
+      warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
+      assert.equal(warns.length, 1);
+      assert(/foo\.js' thinks 'external' export default but.+?bar\.js' disagrees/.test(warns[0].message));
     })
   );
 });

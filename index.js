@@ -65,7 +65,7 @@ function factory(options = {}) {
   }
   
   function writeCjsEsCache() {
-    const data = Object.entries(exportTable).filter(e => e[1].trusted)
+    const data = Object.entries(exportTable).filter(e => e[1].trusted || e[1].external)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .reduce((output, [id, info]) => {
         id = path.relative(".").replace(/\\/g, "/");
@@ -127,6 +127,11 @@ function factory(options = {}) {
     return Promise.all(Object.entries(info.import).map(([name, importInfo]) => {
       return context.resolveId(name, id)
         .then(importee => {
+          let external = false;
+          if (!importee) {
+            importee = name;
+            external = true;
+          }
           if (exportTable[importee]) {
             if (exportTable[importee].default && !importInfo.default) {
               warnImport(importee, "default");
@@ -135,11 +140,15 @@ function factory(options = {}) {
               warnImport(importee, "names");
             }
           } else {
-            exportTable[importee] = {
+            const newGuess = {
               default: importInfo.default,
               named: importInfo.named.length > 0 || importInfo.all,
-              expectBy: id
+              expectBy: id,
+              external
             };
+            if (newGuess.default || newGuess.named) {
+              exportTable[importee] = newGuess;
+            }
           }
         });
     }));
@@ -148,13 +157,13 @@ function factory(options = {}) {
       const shortId = path.relative(".", id);
       const shortImportee = path.relative(".", importee);
       const expectBy = path.relative(".", exportTable[importee].expectBy);
-      context.warn(`${expectBy} think ${shortImportee} export ${type} but ${shortId} disagreed`);
+      context.warn(`'${expectBy}' thinks '${shortImportee}' export ${type} but '${shortId}' disagrees`);
     }
     
     function warnExport(type) {
       const shortId = path.relative(".", id);
       const expectBy = path.relative(".", exportTable[id].expectBy);
-      context.warn(`${shortId} doesn't export ${type} expected by ${expectBy}`);
+      context.warn(`'${shortId}' doesn't export ${type} expected by '${expectBy}'`);
     }
   }
   
@@ -200,7 +209,7 @@ function factory(options = {}) {
         sourceMap: options.sourceMap,
         importStyle: requireId => 
           this.resolveId(requireId, id)
-            .then(getExportType),
+            .then(newId => getExportType(newId || requireId)),
         exportStyle: () => getExportTypeFromOptions(id),
         nested: options.nested,
         warn: (message, pos) => {
