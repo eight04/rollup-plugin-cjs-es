@@ -162,3 +162,30 @@ describe("export table", () => {
     })
   );
 });
+
+describe("cache", () => {
+  it("use cache", () => {
+    const files = {};
+    const fs = {
+      readFileSync(file) {
+        if (!files[file]) {
+          throw new Error("not found");
+        }
+        return files[file];
+      },
+      writeFileSync(file, data) {
+        files[file] = data;
+      }
+    };
+    return bundle("export-type-unmatched", {cache: true, _fs: fs})
+      .then(({warns}) => {
+        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
+        assert.equal(warns.length, 1);
+        return bundle("export-type-unmatched", {cache: true, _fs: fs});
+      })
+      .then(({warns}) => {
+        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
+        assert.equal(warns.length, 0);
+      });
+  });
+});

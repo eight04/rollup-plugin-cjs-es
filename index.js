@@ -27,6 +27,7 @@ function factory(options = {}) {
   let parse = null;
   const exportTable = {};
   const exportCache = {};
+  const {_fs = fs} = options;
   
   if (typeof options.exportType === "object") {
     const newMap = {};
@@ -54,7 +55,7 @@ function factory(options = {}) {
   function loadCjsEsCache() {
     let data;
     try {
-      data = fs.readFileSync(".cjsescache", "utf8");
+      data = _fs.readFileSync(".cjsescache", "utf8");
     } catch (err) {
       return;
     }
@@ -68,11 +69,11 @@ function factory(options = {}) {
     const data = Object.entries(exportTable).filter(e => e[1].trusted || e[1].external)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .reduce((output, [id, info]) => {
-        id = path.relative(".").replace(/\\/g, "/");
+        id = path.relative(".", id).replace(/\\/g, "/");
         output[id] = info.named ? "named" : "default";
         return output;
       }, {});
-    fs.writeFileSync(".cjsescache", JSON.stringify(data, null, 2), "utf8");
+    _fs.writeFileSync(".cjsescache", JSON.stringify(data, null, 2), "utf8");
   }
   
   function getExportTypeFromOptions(id) {
