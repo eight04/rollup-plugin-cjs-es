@@ -71,7 +71,7 @@ export default {
 };
   `.trim();
   it("named", () => 
-    bundle("entry.js", {exportType: "named"})
+    bundle("export-type/entry.js", {exportType: "named"})
       .then(({codes: [entry, foo]}) => {
         assert(entry.includes(entryImportNamed));
         assert(entry.includes(entryExportNamed));
@@ -79,7 +79,7 @@ export default {
       })
   );
   it("default", () =>
-    bundle("entry.js", {exportType: "default"})
+    bundle("export-type/entry.js", {exportType: "default"})
       .then(({codes: [entry, foo]}) => {
         assert(entry.includes(entryImportDefault));
         assert(entry.includes(entryExportDefault));
@@ -89,21 +89,14 @@ export default {
   it("function", () => {
     let fooCount = 0;
     return bundle(
-      "entry.js",
-      {exportType: (moduleId, importer) => {
+      "export-type/entry.js",
+      {exportType: (moduleId) => {
         if (moduleId.endsWith("entry.js")) {
-          assert(!importer); // no importer for entry.
           return "named";
         }
         if (moduleId.endsWith("foo.js")) {
           fooCount++;
-          if (fooCount === 1) {
-            assert(importer.endsWith("entry.js")); // required by entry.js
-          } else if (fooCount === 2) {
-            assert(!importer); // no importer when trasnforming exports.
-          } else {
-            throw new Error(`foo is required ${fooCount} times`);
-          }
+          assert(fooCount <= 2);
           return "default";
         }
         throw new Error(`Unknown moduleId ${moduleId}`);
@@ -117,10 +110,10 @@ export default {
       });
   });
   it("object map", () =>
-    bundle("entry.js", 
+    bundle("export-type/entry.js", 
       {exportType: {
-        "./test/fixtures/foo": "default",
-        "./test/fixtures/entry": "named"
+        "./test/fixtures/export-type/foo.js": "default",
+        "./test/fixtures/export-type/entry.js": "named"
       }}
     )
       .then(({codes: [entry, foo]}) => {
