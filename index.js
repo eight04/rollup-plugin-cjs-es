@@ -1,6 +1,5 @@
 const fs = require("fs");
 const path = require("path");
-const {promisify} = require("util");
 
 const {transform: cjsEs} = require("cjs-es");
 const mergeSourceMap = require("merge-source-map");

@@ -10,7 +10,7 @@ function bundle(file, options) {
   return rollup.rollup({
     input: [`${__dirname}/fixtures/${file}`],
     plugins: [
-      cjsToEs(options),
+      cjsToEs(Object.assign({cache: false}, options)),
       {transform(code) {
         codes.push(code.replace(/\r/g, ""));
       }}
@@ -191,11 +191,11 @@ describe("export table", () => {
     })
   );
   
-  it("get export type from table", () =>
-    bundle("get-export-type-from-table/entry.js").then(({warns, codes}) => {
+  it("export type unmatched default", () =>
+    bundle("export-type-unmatched-default/entry.js").then(({warns}) => {
       warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
-      assert.equal(warns.length, 0);
-      assert(codes[1].includes("export default"));
+      assert.equal(warns.length, 1);
+      assert(/foo\.js doesn't export default expected by.+?entry\.js/.test(warns[0].message));
     })
   );
 });
