@@ -151,33 +151,33 @@ import("foo").then(bar);
 
 describe("splitCode", () => {
   it("normal", () =>
-    bundle("split-code-a.js", undefined).then(({bundleResult}) => {
+    bundle("split-code/entry.js", undefined).then(({bundleResult}) => {
       assert.equal(Object.keys(bundleResult).length, 1);
-      const module = bundleResult["split-code-a.js"];
+      const module = bundleResult.output["entry.js"];
       assert(module);
-      assert.equal(module.modules.length, 1);
+      assert.equal(Object.keys(module.modules).length, 1);
       assert(module.code.includes("return require"));
     })
   );
   it("hoist", () =>
-    bundle("split-code-a.js", {nested: true}).then(({bundleResult}) => {
+    bundle("split-code/entry.js", {nested: true}).then(({bundleResult}) => {
       assert.equal(Object.keys(bundleResult).length, 1);
-      const module = bundleResult["split-code-a.js"];
+      const module = bundleResult.output["entry.js"];
       assert(module);
-      assert.equal(module.modules.length, 2);
+      assert.equal(Object.keys(module.modules).length, 2);
       assert(!module.code.includes("require("));
     })
   );
   it("splitCode", () =>
-    bundle("split-code-a.js", {nested: true, splitCode: true}).then(({bundleResult}) => {
+    bundle("split-code/entry.js", {nested: true, splitCode: true}).then(({bundleResult}) => {
       assert.equal(Object.keys(bundleResult).length, 2);
-      const moduleA = bundleResult["split-code-a.js"];
+      const moduleA = bundleResult.output["entry.js"];
       assert(moduleA);
-      assert.equal(moduleA.modules.length, 1);
+      assert.equal(Object.keys(moduleA.modules).length, 1);
       assert(moduleA.code.includes("return require"));
-      const moduleB = bundleResult["split-code-b.js"];
+      const moduleB = bundleResult.output["foo.js"];
       assert(moduleB);
-      assert.equal(moduleB.modules.length, 1);
+      assert.equal(Object.keys(moduleB.modules).length, 1);
     })
   );
 });
