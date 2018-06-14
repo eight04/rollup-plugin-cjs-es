@@ -6,6 +6,7 @@ const rollup = require("rollup");
 
 function bundle(file, options) {
   const codes = [];
+  const warns = [];
   return rollup.rollup({
     input: [`${__dirname}/fixtures/${file}`],
     plugins: [
@@ -15,7 +16,9 @@ function bundle(file, options) {
       }}
     ],
     experimentalCodeSplitting: true,
-    experimentalDynamicImport: true
+    onwarn(warn) {
+      warns.push(warn);
+    }
   })
     .then(bundle => bundle.generate({
       format: "cjs",
@@ -23,7 +26,7 @@ function bundle(file, options) {
       freeze: false,
       sourcemap: true
     }))
-    .then(bundleResult => ({codes, bundleResult}));
+    .then(bundleResult => ({codes, warns, bundleResult}));
 }
 
 function test(file, options, ...expects) {
@@ -186,10 +189,20 @@ describe("splitCode", () => {
   );
 });
 
-describe("export type unmatched", () => {
-  it("unmatched", () =>
-    bundle("export-type-unmatched/entry.js").then(result => {
-      console.log(result);
+describe("export table", () => {
+  it("export type unmatched", () =>
+    bundle("export-type-unmatched/entry.js").then(({warns}) => {
+      warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
+      assert.equal(warns.length, 1);
+      assert(/foo\.js doesn't export names expected by.+?entry\.js/.test(warns[0].message));
+    })
+  );
+  
+  it("get export type from table", () =>
+    bundle("get-export-type-from-table/entry.js").then(({warns, codes}) => {
+      warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
+      assert.equal(warns.length, 0);
+      assert(codes[1].includes("export default"));
     })
   );
 });

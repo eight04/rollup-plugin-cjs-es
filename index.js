@@ -109,20 +109,20 @@ function factory(options = {}) {
   
   const filter = createFilter(options.include, options.exclude);
   
-  function checkExportTable(id, context, info, trusted = false) {
+  function checkExportTable(id, context, info, trusted = false, expectBy = id) {
     if (exportTable[id]) {
-      if (exportTable[id].export.default && !info.export.default) {
+      if (exportTable[id].default && !info.default) {
         context.warn(`${id} doesn't export default expected by ${exportTable[id].expectBy}`);
       }
-      if (exportTable[id].export.named && !info.export.named.length) {
+      if (exportTable[id].named && !info.named.length && !info.all) {
         context.warn(`${id} doesn't export names expected by ${exportTable[id].expectBy}`);
       }
     }
     if (!exportTable[id] || !exportTable[id].trusted) {
       exportTable[id] = {
         default: info.default,
-        named: info.named.length > 0,
-        expectBy: id,
+        named: info.named.length > 0 || info.all,
+        expectBy,
         trusted
       };
     }
@@ -132,13 +132,13 @@ function factory(options = {}) {
     if (!info) {
       info = esInfoAnalyze(context.parse(code))
     }
-    checkExportTable(id, context, info, true);
-    for (const [name, importInfo] of Object.entries(info.import)) {
-      context.resolveId(name, id)
+    checkExportTable(id, context, info.export, true);
+    return Promise.all(Object.entries(info.import).map(([name, importInfo]) => {
+      return context.resolveId(name, id)
         .then(newId => {
-          checkExportTable(newId, context, importInfo);
+          checkExportTable(newId, context, importInfo, false, id);
         });
-    }
+    }));
   }
   
 	return {
@@ -154,8 +154,8 @@ function factory(options = {}) {
       let ast = parse(code);
       const info = esInfoAnalyze(ast);
       if (isEsModule(info)) {
-        setTimeout(updateExportTable, 0, {context: this, info, id});
-        return;
+        return updateExportTable({context: this, info, id})
+          .then(() => undefined);
       }
       const maps = [];
       let isTouched;
@@ -201,11 +201,11 @@ function factory(options = {}) {
             ast = null;
           }
           if (isTouched) {
-            setTimeout(updateExportTable, 0, {context: this, code, id})
-            return {
-              code,
-              map: options.sourceMap && maps.length && joinMaps(maps)
-            };
+            return updateExportTable({context: this, code, id})
+              .then(() => ({
+                code,
+                map: options.sourceMap && maps.length && joinMaps(maps)
+              }));
           }
         });
     },
