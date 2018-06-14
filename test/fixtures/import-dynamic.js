@@ -1,1 +1,0 @@
-Promise.resolve(require("foo")).then(bar);

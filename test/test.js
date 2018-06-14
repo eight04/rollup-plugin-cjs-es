@@ -29,32 +29,9 @@ function bundle(file, options) {
     .then(bundleResult => ({codes, warns, bundleResult}));
 }
 
-function test(file, options, ...expects) {
-  return bundle(file, options)
-    .then(({codes}) => {
-      while (expects.length) {
-        assert.equal(codes.shift(), expects.shift());
-      }
-    });
-}
-
 function readFixture(file) {
   return fs.readFileSync(`${__dirname}/fixtures/${file}`, "utf8").replace(/\r/g, "");
 }
-
-describe("import", () => {
-  it("normal", () => test("import.js", undefined, 'import * as foo from "foo";'));
-  it("default comment", () =>
-    test("import-default.js", undefined, 'import foo from "foo"; // default')
-  );
-});
-
-describe("export", () => {
-  it("normal", () => test("export.js", undefined, "export {foo};"));
-  it("default comment", () =>
-    test("export-default.js", undefined, "export default {foo}; // default")
-  );
-});
 
 describe("exportType", () => {
   const entryImportNamed = 'import * as foo from "./foo"';
@@ -121,31 +98,6 @@ export default {
         assert(entry.includes(entryExportNamed));
         assert(foo.includes(fooExportDefault));
       })
-  );
-});
-
-describe("nested", () => {
-  const orig = readFixture("import-anywhere.js");
-  const hoisted = `
-import * as _require_foo_ from "foo";
-if (foo) {
-  const bar = _require_foo_;
-}
-  `.trim();
-  
-  it("false", () => test("import-anywhere.js", undefined, orig));
-  it("true", () => test("import-anywhere.js", {nested: true}, hoisted));
-});
-
-describe("nested dynamicImport", () => {
-  const orig = readFixture("import-dynamic.js");
-  const dynamic = `
-import("foo").then(bar);
-  `.trim();
-  
-  it("false", () => test("import-dynamic.js", undefined, orig));
-  it("true", () =>
-    test("import-dynamic.js", {nested: true}, dynamic)
   );
 });
 
