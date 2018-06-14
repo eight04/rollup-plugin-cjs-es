@@ -1,3 +1,4 @@
+const fs = require("fs");
 const path = require("path");
 const {promisify} = require("util");
 
@@ -5,7 +6,6 @@ const {transform: cjsEs} = require("cjs-es");
 const mergeSourceMap = require("merge-source-map");
 const {createFilter} = require("rollup-pluginutils");
 const {analyze: esInfoAnalyze} = require("es-info");
-const nodeResolve = promisify(require("resolve"));
 const {wrapImport} = require("./lib/wrap-import");
 const {unwrapImport} = require("./lib/unwrap-import");
 
@@ -26,16 +26,54 @@ function isEsModule(result) {
 function factory(options = {}) {
   let isImportWrapped = false;
   let parse = null;
-  const rollupOptions = {};
   const exportTable = {};
+  const exportCache = {};
   
   if (typeof options.exportType === "object") {
     const newMap = {};
     for (const key of Object.keys(options.exportType)) {
-      const newKey = require.resolve(path.resolve(key));
+      const newKey = path.resolve(key);
       newMap[newKey] = options.exportType[key];
     }
     options.exportType = newMap;
+  }
+  
+  if (options.sourceMap == null) {
+    options.sourceMap = true;
+  }
+  
+  if (options.cache == null) {
+    options.cache = true;
+  }
+  
+  const filter = createFilter(options.include, options.exclude);
+  
+  if (options.cache) {
+    loadCjsEsCache();
+  }
+  
+  function loadCjsEsCache() {
+    let data;
+    try {
+      data = fs.readFileSync(".cjsescache", "utf8");
+    } catch (err) {
+      return;
+    }
+    data = JSON.parse(data);
+    for (const [id, type] of Object.entries(data)) {
+      exportCache[path.resolve(id)] = type;
+    }
+  }
+  
+  function writeCjsEsCache() {
+    const data = Object.entries(exportTable).filter(e => e[1].trusted)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .reduce((output, [id, info]) => {
+        id = path.relative(".").replace(/\\/g, "/");
+        output[id] = info.named ? "named" : "default";
+        return output;
+      }, {});
+    fs.writeFileSync(".cjsescache", JSON.stringify(data, null, 2), "utf8");
   }
   
   function getExportTypeFromOptions(id) {
@@ -49,24 +87,25 @@ function factory(options = {}) {
       options.exportType(id) : options.exportType[id];
   }
   
-  function getExportTypeFromTable(id) {
-    if (exportTable[id]) {
+  function getExportType(id) {
+    // get export type from trusted table
+    if (exportTable[id] && exportTable[id].trusted) {
       return exportTable[id].named ? "named" : "default";
     }
-  }
-  
-  function getExportType(id) {
+    // get export type from options
     return Promise.resolve(getExportTypeFromOptions(id))
       .then(result => {
-        return result ? result : getExportTypeFromTable(id);
+        if (result) {
+          return result;
+        }
+        // get export type from guess table
+        if (exportTable[id]) {
+          return exportTable[id].named ? "named" : "default";
+        }
+        // get export type from cache
+        return exportCache[id];
       });
   }
-  
-  if (options.sourceMap == null) {
-    options.sourceMap = true;
-  }
-  
-  const filter = createFilter(options.include, options.exclude);
   
   function checkExportTable(id, context, info, trusted = false, expectBy = id) {
     if (exportTable[id]) {
@@ -108,9 +147,6 @@ function factory(options = {}) {
   
 	return {
     name: "rollup-plugin-cjs-es",
-    options(_rollupOptions) {
-      Object.assign(rollupOptions, _rollupOptions);
-    },
     transform(code, id) {
       if (!filter(id)) {
         return;
@@ -152,7 +188,7 @@ function factory(options = {}) {
         importStyle: requireId => 
           this.resolveId(requireId, id)
             .then(getExportType),
-        exportStyle: () => getExportType(id),
+        exportStyle: () => getExportTypeFromOptions(id),
         nested: options.nested,
         warn: (message, pos) => {
           this.warn(message, pos);
@@ -174,7 +210,7 @@ function factory(options = {}) {
           }
         });
     },
-    transformBundle(code, {format}) {
+    transformChunk(code, {format}) {
       if (!isImportWrapped) {
         return;
       }
@@ -191,6 +227,11 @@ function factory(options = {}) {
           code: result.code,
           map: result.map
         };
+      }
+    },
+    buildEnd() {
+      if (options.cache) {
+        writeCjsEsCache();
       }
     }
   };
