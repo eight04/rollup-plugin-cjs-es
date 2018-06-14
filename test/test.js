@@ -185,3 +185,11 @@ describe("splitCode", () => {
     })
   );
 });
+
+describe("export type unmatched", () => {
+  it("unmatched", () =>
+    bundle("export-type-unmatched/entry.js").then(result => {
+      console.log(result);
+    })
+  );
+});
