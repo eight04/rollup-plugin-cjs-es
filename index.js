@@ -112,10 +112,10 @@ function factory(options = {}) {
   function checkExportTable(id, context, info, trusted = false, expectBy = id) {
     if (exportTable[id]) {
       if (exportTable[id].default && !info.default) {
-        context.warn(`${id} doesn't export default expected by ${exportTable[id].expectBy}`);
+        warn(id, exportTable[id].expectBy, "default");
       }
       if (exportTable[id].named && !info.named.length && !info.all) {
-        context.warn(`${id} doesn't export names expected by ${exportTable[id].expectBy}`);
+        warn(id, exportTable[id].expectBy, "names");
       }
     }
     if (!exportTable[id] || !exportTable[id].trusted) {
@@ -126,11 +126,17 @@ function factory(options = {}) {
         trusted
       };
     }
+    
+    function warn(id, expectBy, type) {
+      id = path.relative(".", id);
+      expectBy = path.relative(".", expectBy);
+      context.warn(`${id} doesn't export ${type} expected by ${expectBy}`);
+    }
   }
   
   function updateExportTable({id, code, context, info}) {
     if (!info) {
-      info = esInfoAnalyze(context.parse(code))
+      info = esInfoAnalyze(context.parse(code));
     }
     checkExportTable(id, context, info.export, true);
     return Promise.all(Object.entries(info.import).map(([name, importInfo]) => {
