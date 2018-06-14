@@ -1,16 +1,15 @@
 /* eslint-env mocha */
-const fs = require("fs");
 const assert = require("assert");
-const cjsToEs = require("..");
+const cjsEs = require("..");
 const rollup = require("rollup");
 
-function bundle(file, options) {
+function bundle(dir, options) {
   const codes = [];
   const warns = [];
   return rollup.rollup({
-    input: [`${__dirname}/fixtures/${file}`],
+    input: [`${__dirname}/fixtures/${dir}/entry.js`],
     plugins: [
-      cjsToEs(Object.assign({cache: false}, options)),
+      cjsEs(Object.assign({cache: false}, options)),
       {transform(code) {
         codes.push(code.replace(/\r/g, ""));
       }}
@@ -29,10 +28,6 @@ function bundle(file, options) {
     .then(bundleResult => ({codes, warns, bundleResult}));
 }
 
-function readFixture(file) {
-  return fs.readFileSync(`${__dirname}/fixtures/${file}`, "utf8").replace(/\r/g, "");
-}
-
 describe("exportType", () => {
   const entryImportNamed = 'import * as foo from "./foo"';
   const entryImportDefault = 'import foo from "./foo"';
@@ -48,7 +43,7 @@ export default {
 };
   `.trim();
   it("named", () => 
-    bundle("export-type/entry.js", {exportType: "named"})
+    bundle("export-type", {exportType: "named"})
       .then(({codes: [entry, foo]}) => {
         assert(entry.includes(entryImportNamed));
         assert(entry.includes(entryExportNamed));
@@ -56,7 +51,7 @@ export default {
       })
   );
   it("default", () =>
-    bundle("export-type/entry.js", {exportType: "default"})
+    bundle("export-type", {exportType: "default"})
       .then(({codes: [entry, foo]}) => {
         assert(entry.includes(entryImportDefault));
         assert(entry.includes(entryExportDefault));
@@ -66,7 +61,7 @@ export default {
   it("function", () => {
     let fooCount = 0;
     return bundle(
-      "export-type/entry.js",
+      "export-type",
       {exportType: (moduleId) => {
         if (moduleId.endsWith("entry.js")) {
           return "named";
@@ -87,7 +82,7 @@ export default {
       });
   });
   it("object map", () =>
-    bundle("export-type/entry.js", 
+    bundle("export-type", 
       {exportType: {
         "./test/fixtures/export-type/foo.js": "default",
         "./test/fixtures/export-type/entry.js": "named"
@@ -103,7 +98,7 @@ export default {
 
 describe("splitCode", () => {
   it("normal", () =>
-    bundle("split-code/entry.js", undefined).then(({bundleResult}) => {
+    bundle("split-code", undefined).then(({bundleResult}) => {
       assert.equal(Object.keys(bundleResult).length, 1);
       const module = bundleResult.output["entry.js"];
       assert(module);
@@ -112,7 +107,7 @@ describe("splitCode", () => {
     })
   );
   it("hoist", () =>
-    bundle("split-code/entry.js", {nested: true}).then(({bundleResult}) => {
+    bundle("split-code", {nested: true}).then(({bundleResult}) => {
       assert.equal(Object.keys(bundleResult).length, 1);
       const module = bundleResult.output["entry.js"];
       assert(module);
@@ -121,7 +116,7 @@ describe("splitCode", () => {
     })
   );
   it("splitCode", () =>
-    bundle("split-code/entry.js", {nested: true, splitCode: true}).then(({bundleResult}) => {
+    bundle("split-code", {nested: true, splitCode: true}).then(({bundleResult}) => {
       assert.equal(Object.keys(bundleResult.output).length, 2);
       const moduleA = bundleResult.output["entry.js"];
       assert(moduleA);
@@ -136,7 +131,7 @@ describe("splitCode", () => {
 
 describe("export table", () => {
   it("export type unmatched", () =>
-    bundle("export-type-unmatched/entry.js").then(({warns}) => {
+    bundle("export-type-unmatched").then(({warns}) => {
       warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
       assert.equal(warns.length, 1);
       assert(/foo\.js doesn't export names expected by.+?entry\.js/.test(warns[0].message));
@@ -144,7 +139,7 @@ describe("export table", () => {
   );
   
   it("export type unmatched default", () =>
-    bundle("export-type-unmatched-default/entry.js").then(({warns}) => {
+    bundle("export-type-unmatched-default").then(({warns}) => {
       warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
       assert.equal(warns.length, 1);
       assert(/foo\.js doesn't export default expected by.+?entry\.js/.test(warns[0].message));
