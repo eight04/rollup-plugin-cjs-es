@@ -23,52 +23,11 @@ function isEsModule(result) {
     result.export.all;
 }
 
-function createResolve(rollupOptions) {
-  return (importee, importer) => {
-    return new Promise((resolve, reject) => {
-      const plugins = rollupOptions.plugins || [];
-      resolveId(0);
-      function resolveId(i) {
-        if (i >= plugins.length) {
-          const basedir = path.dirname(importer);
-          nodeResolve(importee, {basedir})
-            .then(resolve, reject);
-          return;
-        }
-        if (!plugins[i].resolveId) {
-          setImmediate(resolveId, i + 1);
-          return;
-        }
-        let pending;
-        try {
-          pending = Promise.resolve(plugins[i].resolveId(importee, importer));
-        } catch (err) {
-          reject(err);
-          return;
-        }
-        pending
-          .then(result => {
-            if (result) {
-              resolve(result);
-              return;
-            }
-            setImmediate(resolveId, i + 1);
-          })
-          .catch(reject);
-      }
-    });
-  };  
-}
-
 function factory(options = {}) {
   let isImportWrapped = false;
   let parse = null;
   const rollupOptions = {};
   const exportTable = {};
-  
-  if (!options.resolve) {
-    options.resolve = createResolve(rollupOptions);
-  }
   
   if (typeof options.exportType === "object") {
     const newMap = {};
