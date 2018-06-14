@@ -170,7 +170,7 @@ describe("splitCode", () => {
   );
   it("splitCode", () =>
     bundle("split-code/entry.js", {nested: true, splitCode: true}).then(({bundleResult}) => {
-      assert.equal(Object.keys(bundleResult).length, 2);
+      assert.equal(Object.keys(bundleResult.output).length, 2);
       const moduleA = bundleResult.output["entry.js"];
       assert(moduleA);
       assert.equal(Object.keys(moduleA.modules).length, 1);
