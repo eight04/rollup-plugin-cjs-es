@@ -27,7 +27,7 @@
     "eslint": "^4.19.1",
     "mocha": "^5.1.1",
     "nyc": "^11.7.1",
-    "rollup": "^0.58.2"
+    "rollup": "^0.60.7"
   },
   "dependencies": {
     "cjs-es": "^0.4.4",
@@ -35,10 +35,9 @@
     "estree-walker": "^0.5.1",
     "magic-string": "^0.24.0",
     "merge-source-map": "^1.1.0",
-    "resolve": "^1.7.1",
     "rollup-pluginutils": "^2.0.1"
   },
   "peerDependencies": {
-    "rollup": ">=0.58.2"
+    "rollup": ">=0.60"
   }
 }

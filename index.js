@@ -1,11 +1,10 @@
+const fs = require("fs");
 const path = require("path");
-const {promisify} = require("util");
 
 const {transform: cjsEs} = require("cjs-es");
 const mergeSourceMap = require("merge-source-map");
 const {createFilter} = require("rollup-pluginutils");
-const esInfo = require("es-info");
-const nodeResolve = promisify(require("resolve"));
+const {analyze: esInfoAnalyze} = require("es-info");
 const {wrapImport} = require("./lib/wrap-import");
 const {unwrapImport} = require("./lib/unwrap-import");
 
@@ -16,102 +15,171 @@ function joinMaps(maps) {
   return maps[0];
 }
 
-function isEsModule(ast) {
-  const result = esInfo.analyze(ast);
+function isEsModule(result) {
   return Object.keys(result.import).length ||
     result.export.default ||
     result.export.named.length ||
     result.export.all;
 }
 
-function createResolve(rollupOptions) {
-  return (importee, importer) => {
-    return new Promise((resolve, reject) => {
-      const plugins = rollupOptions.plugins || [];
-      resolveId(0);
-      function resolveId(i) {
-        if (i >= plugins.length) {
-          const basedir = path.dirname(importer);
-          nodeResolve(importee, {basedir})
-            .then(resolve, reject);
-          return;
-        }
-        if (!plugins[i].resolveId) {
-          setImmediate(resolveId, i + 1);
-          return;
-        }
-        let pending;
-        try {
-          pending = Promise.resolve(plugins[i].resolveId(importee, importer));
-        } catch (err) {
-          reject(err);
-          return;
-        }
-        pending
-          .then(result => {
-            if (result) {
-              resolve(result);
-              return;
-            }
-            setImmediate(resolveId, i + 1);
-          })
-          .catch(reject);
-      }
-    });
-  };  
-}
-
 function factory(options = {}) {
   let isImportWrapped = false;
   let parse = null;
-  const rollupOptions = {};
-  
-  if (!options.resolve) {
-    options.resolve = createResolve(rollupOptions);
-  }
+  const exportTable = {};
+  const exportCache = {};
+  const {_fs = fs} = options;
   
   if (typeof options.exportType === "object") {
     const newMap = {};
     for (const key of Object.keys(options.exportType)) {
-      const newKey = require.resolve(path.resolve(key));
+      const newKey = path.resolve(key);
       newMap[newKey] = options.exportType[key];
     }
     options.exportType = newMap;
-  }
-  
-  function getExportType(id, importer) {
-    if (!options.exportType) {
-      return;
-    }
-    if (typeof options.exportType === "string") {
-      return options.exportType;
-    }
-    return Promise.resolve(importer ? options.resolve(id, importer) : id)
-      .then(id => {
-        return typeof options.exportType === "function" ?
-          options.exportType(id, importer) : options.exportType[id];
-      });
   }
   
   if (options.sourceMap == null) {
     options.sourceMap = true;
   }
   
+  if (options.cache == null) {
+    options.cache = true;
+  }
+  
   const filter = createFilter(options.include, options.exclude);
+  
+  if (options.cache) {
+    loadCjsEsCache();
+  }
+  
+  function loadCjsEsCache() {
+    let data;
+    try {
+      data = _fs.readFileSync(".cjsescache", "utf8");
+    } catch (err) {
+      return;
+    }
+    data = JSON.parse(data);
+    for (const [id, type] of Object.entries(data)) {
+      exportCache[path.resolve(id)] = type;
+    }
+  }
+  
+  function writeCjsEsCache() {
+    const data = Object.entries(exportTable).filter(e => e[1].trusted || e[1].external)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .reduce((output, [id, info]) => {
+        id = path.relative(".", id).replace(/\\/g, "/");
+        output[id] = info.named ? "named" : "default";
+        return output;
+      }, {});
+    _fs.writeFileSync(".cjsescache", JSON.stringify(data, null, 2), "utf8");
+  }
+  
+  function getExportTypeFromOptions(id) {
+    if (!options.exportType) {
+      return;
+    }
+    if (typeof options.exportType === "string") {
+      return options.exportType;
+    }
+    return typeof options.exportType === "function" ?
+      options.exportType(id) : options.exportType[id];
+  }
+  
+  function getExportType(id) {
+    // get export type from trusted table
+    if (exportTable[id] && exportTable[id].trusted) {
+      return exportTable[id].named ? "named" : "default";
+    }
+    // get export type from options
+    return Promise.resolve(getExportTypeFromOptions(id))
+      .then(result => {
+        if (result) {
+          return result;
+        }
+        // get export type from guess table
+        if (exportTable[id]) {
+          return exportTable[id].named ? "named" : "default";
+        }
+        // get export type from cache
+        return exportCache[id];
+      });
+  }
+  
+  function updateExportTable({id, code, context, info}) {
+    if (!info) {
+      info = esInfoAnalyze(context.parse(code));
+    }
+    if (exportTable[id]) {
+      if (exportTable[id].default && !info.export.default) {
+        warnExport("default");
+      }
+      if (exportTable[id].named && !info.export.named.length && !info.export.all) {
+        warnExport("names");
+      }
+    }
+    exportTable[id] = {
+      default: info.default,
+      named: info.export.named.length > 0 || info.all,
+      expectBy: id,
+      trusted: true
+    };
+    return Promise.all(Object.entries(info.import).map(([name, importInfo]) => {
+      return context.resolveId(name, id)
+        .then(importee => {
+          let external = false;
+          if (!importee) {
+            importee = name;
+            external = true;
+          }
+          if (exportTable[importee]) {
+            if (exportTable[importee].default && !importInfo.default) {
+              warnImport(importee, "default");
+            }
+            if (exportTable[importee].named && !importInfo.named.length && !importInfo.all) {
+              warnImport(importee, "names");
+            }
+          } else {
+            const newGuess = {
+              default: importInfo.default,
+              named: importInfo.named.length > 0 || importInfo.all,
+              expectBy: id,
+              external
+            };
+            if (newGuess.default || newGuess.named) {
+              exportTable[importee] = newGuess;
+            }
+          }
+        });
+    }));
+    
+    function warnImport(importee, type) {
+      const shortId = path.relative(".", id);
+      const shortImportee = path.relative(".", importee);
+      const expectBy = path.relative(".", exportTable[importee].expectBy);
+      context.warn(`'${expectBy}' thinks '${shortImportee}' export ${type} but '${shortId}' disagrees`);
+    }
+    
+    function warnExport(type) {
+      const shortId = path.relative(".", id);
+      const expectBy = path.relative(".", exportTable[id].expectBy);
+      context.warn(`'${shortId}' doesn't export ${type} expected by '${expectBy}'`);
+    }
+  }
   
 	return {
     name: "rollup-plugin-cjs-es",
-    options(_rollupOptions) {
-      Object.assign(rollupOptions, _rollupOptions);
-    },
     transform(code, id) {
       if (!filter(id)) {
         return;
       }
       parse = this.parse;
       let ast = parse(code);
-      if (isEsModule(ast)) {
-        return;
+      const info = esInfoAnalyze(ast);
+      if (isEsModule(info)) {
+        return updateExportTable({context: this, info, id})
+          .then(() => undefined);
       }
       const maps = [];
       let isTouched;
@@ -140,8 +208,10 @@ function factory(options = {}) {
         parse,
         ast,
         sourceMap: options.sourceMap,
-        importStyle: requireId => getExportType(requireId, id),
-        exportStyle: () => getExportType(id),
+        importStyle: requireId => 
+          this.resolveId(requireId, id)
+            .then(newId => getExportType(newId || requireId)),
+        exportStyle: () => getExportTypeFromOptions(id),
         nested: options.nested,
         warn: (message, pos) => {
           this.warn(message, pos);
@@ -155,14 +225,15 @@ function factory(options = {}) {
             ast = null;
           }
           if (isTouched) {
-            return {
-              code,
-              map: options.sourceMap && maps.length && joinMaps(maps)
-            };
+            return updateExportTable({context: this, code, id})
+              .then(() => ({
+                code,
+                map: options.sourceMap && maps.length && joinMaps(maps)
+              }));
           }
         });
     },
-    transformBundle(code, {format}) {
+    transformChunk(code, {format}) {
       if (!isImportWrapped) {
         return;
       }
@@ -179,6 +250,11 @@ function factory(options = {}) {
           code: result.code,
           map: result.map
         };
+      }
+    },
+    buildEnd() {
+      if (options.cache) {
+        writeCjsEsCache();
       }
     }
   };
