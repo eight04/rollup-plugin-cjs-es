@@ -357,6 +357,11 @@ This module exports a single function.
 Changelog
 ---------
 
+* 0.4.0 (Jun 16, 2018)
+
+  - **Update rollup to 0.60.**
+  - **Add: `options.cache`. Now the plugin would generate a cache file by default.**
+
 * 0.3.2 (May 4, 2018)
 
   - Fix: `TypeError: cannot access property 'name' on undefined` in unwrapImport.
