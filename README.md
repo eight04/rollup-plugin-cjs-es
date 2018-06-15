@@ -328,6 +328,7 @@ This module exports a single function.
 
 * `include`: `Array<string>`. A list of minimatch pattern. Only matched files would be transformed. Match all files by default.
 * `exclude`: `Array<string>`. A list of minimatch pattern. Override `options.include`. Default: `[]`.
+* `cache`: `Boolean`. If true then read/write the cache file. Default: `true`.
 * `sourceMap`: `boolean`. If true then generate the source map. Default: `true`.
 * `splitCode`: `boolean|function`. If true then enable code-splitting for require statements which are marked as `// split`. See [Lazy load and code splitting](#lazy-load-and-code-splitting) for details.
 
