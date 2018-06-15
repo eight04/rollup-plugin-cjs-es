@@ -13,6 +13,13 @@ Installation
 npm install -D rollup-plugin-cjs-es
 ```
 
+Features
+--------
+
+* Transform some cases and emit warnings for unconverted `require`s.
+* Use a cache file to solve export type conflicts instead of using proxy modules.
+* Split code with sync `require()` or async `Promise.resolve(require())`.
+
 Usage
 -----
 
@@ -27,11 +34,6 @@ export default {
   },
   plugins: [
     cjsEs({
-      include: ["*.js"],
-      exclude: [],
-      exportType: "default",
-      sourceMap: true,
-      splitCode: true,
       nested: true
     })
   ]
@@ -41,7 +43,7 @@ export default {
 Compatibility
 -------------
 
-`cjs-es` can transform top-level `require`, `exports`, and `module.exports` statements. For those non-top-level statements, the transformer hoist them to top-level (optional, off by default):
+`cjs-es` can transform top-level `require`, `exports`, and `module.exports` statements. For those non-top-level statements, the transformer hoist them to top-level:
 
 ```js
 const baz = require("foo").bar.baz;
@@ -61,7 +63,7 @@ if (baz) {
 }
 ```
 
-However, if `require`, `exports`, or `module` are dynamically assigned, the transformer can't find them e.g.
+However, if `require`, `exports`, or `module` are dynamically assigned, the transformer can't find them and it will emit a warning e.g.
 
 ```js
 (function(r) {
@@ -172,9 +174,11 @@ foo is not exported by foo.js
        ^
 ```
 
-> Although the bundle is created, it is unusable in this case.
+That is because cjs-es tends to import named exports by default.
 
-That is because cjs-es tends to import named export by default. To fix it, [mark the require as `// default`](https://github.com/eight04/cjs-es#import-style), or use `exportType` option to tell the plugin that *foo.js* exports default member:
+To solve this problem, the plugin generates a `.cjsescache` file when a build is finished (whether it succeeded or not), which record the export type of each imported module. In the next build, it will read the cache file and determine the export type according to the cache.
+
+You can also use `exportType` option to tell the plugin that *foo.js* exports default member manually:
 
 ```js
 {
@@ -184,23 +188,6 @@ That is because cjs-es tends to import named export by default. To fix it, [mark
         "path/to/foo.js": "default"
       }
     })  
-  ]
-}
-```
-
-When there are bunch of these warnings, manually adding those modules into `exportType` could be a problem. Therefore, you might want to dump the information about all modules with other plugins e.g. [rollup-plugin-es-info](https://github.com/eight04/rollup-plugin-es-info) then convert it into a `exportType` map.
-
-If you don't care about tree-shaking feature (tree-shaking only works with named exports), you can simply set `options.exportType` to `"default"` so that every modules use default member when importing/exporting:
-
-```js
-{
-  plugins: [
-    resolve({
-      module: false // don't resolve to ES modules since they may export named members.
-    }),
-    cjsEs({
-      exportType: "default"
-    })
   ]
 }
 ```
@@ -285,7 +272,7 @@ import foo from "commonjs-proxy:foo";
 foo.bar();
 ```
 
-With this method, it can first look into the `"foo"` module to check its export type, then generate the proxy module which maps named exports into a default export. However, if the required module `"foo"` uses named exports, it has to be converted into a single object:
+With this technic, it can first look into the `"foo"` module to check its export type, then generate the proxy module which maps named exports into a default export. However, if the required module `"foo"` uses named exports, it has to be converted into a single object:
 
 *commonjs-proxy:foo*
 ```js
@@ -354,16 +341,15 @@ This module exports a single function.
   Default: `false`
   
 * `nested?`: `boolean`. If true then analyze the AST recursively, otherwise only top-level nodes are analyzed. Default: `false`.
-* `exportType`: `string|object|function`. Tell the plugin what type of the export does the module use.
+* `exportType`: `string|object|function`. Tell the plugin how to determine the export type.
 
-  If `exportType` is a function, it receives 2 arguments:
+  If `exportType` is a function, it receives 1 argument:
   
   - `modulId`: `string`. The ID of the module.
-  - `importer`: `null|string`. If the module is imported by an importer, this would be the ID of the importer module.
   
   The return value should be the type of export for `moduleId`.
   
-  If `exportType` is an object, it is a `"path/to/module": type` map.
+  If `exportType` is an object, it is a `"path/to/file.js": type` map.
   
   Default: `"named"`.
 
