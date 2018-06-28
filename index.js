@@ -53,7 +53,8 @@ function factory({
     }
     data = JSON.parse(data);
     for (const [id, expectBy] of Object.entries(data)) {
-      exportCache[path.resolve(id)] = expectBy ? path.resolve(expectBy) : null;
+      exportCache[id[0] === "~" ? id.slice(1) : path.resolve(id)] =
+        expectBy ? path.resolve(expectBy) : null;
     }
   }
   
@@ -66,7 +67,7 @@ function factory({
         } else {
           expectBy = path.relative(".", expectBy).replace(/\\/g, "/");
         }
-        id = path.relative(".", id).replace(/\\/g, "/");
+        id = path.isAbsolute(id) ? path.relative(".", id).replace(/\\/g, "/") : `~${id}`;
         output[id] = expectBy;
         return output;
       }, {});

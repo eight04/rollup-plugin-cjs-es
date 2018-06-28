@@ -96,40 +96,6 @@ export default {
   );
 });
 
-describe("export table", () => {
-  it("export type unmatched", () =>
-    bundle("export-type-unmatched").then(({warns}) => {
-      warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
-      assert.equal(warns.length, 1);
-      assert(/foo\.js' doesn't export names expected by.+?entry\.js/.test(warns[0].message));
-    })
-  );
-  
-  it("export type unmatched default", () =>
-    // marking `require("./foo.js")` as `// default` makes `foo.js` export the default member.
-    bundle("export-type-unmatched-default").then(({warns}) => {
-      warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
-      assert.equal(warns.length, 0);
-    })
-  );
-  
-  it("export type disagree", () =>
-    bundle("export-type-disagree").then(({warns}) => {
-      warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
-      assert.equal(warns.length, 1);
-      assert(/entry\.js' thinks 'external' export names but.+?foo\.js' disagrees/.test(warns[0].message));
-    })
-  );
-  
-  it("export type disagree default", () =>
-    bundle("export-type-disagree-default").then(({warns}) => {
-      warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
-      assert.equal(warns.length, 1);
-      assert(/foo\.js' thinks 'external' export default but.+?bar\.js' disagrees/.test(warns[0].message));
-    })
-  );
-});
-
 describe("cache", () => {
   function prepareFs() {
     const files = {};
@@ -148,13 +114,41 @@ describe("cache", () => {
     return fs;
   }
   
-  it("use cache", () => {
+  it("hoisted default export should be trusted", () => {
     const fs = prepareFs();
-    return bundle("export-type-unmatched", {cache: true, _fs: fs})
+    return bundle("cjs-import-default", {cache: true, _fs: fs})
       .then(({warns}) => {
         warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
         assert.equal(warns.length, 1);
-        return bundle("export-type-unmatched", {cache: true, _fs: fs});
+        return bundle("cjs-import-default", {cache: true, _fs: fs});
+      })
+      .then(({warns}) => {
+        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
+        assert.equal(warns.length, 0);
+      });
+  });
+  
+  it("es module should be trusted", () => {
+    const fs = prepareFs();
+    return bundle("es-import-cjs", {cache: true, _fs: fs})
+      .then(({warns}) => {
+        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
+        assert.equal(warns.length, 2);
+        return bundle("es-import-cjs", {cache: true, _fs: fs});
+      })
+      .then(({warns}) => {
+        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
+        assert.equal(warns.length, 0);
+      });
+  });
+  
+  it("es module should be trusted (disagree external)", () => {
+    const fs = prepareFs();
+    return bundle("es-disagree-external", {cache: true, _fs: fs})
+      .then(({warns}) => {
+        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
+        assert.equal(warns.length, 1);
+        return bundle("es-disagree-external", {cache: true, _fs: fs});
       })
       .then(({warns}) => {
         warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
