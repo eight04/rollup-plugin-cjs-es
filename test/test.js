@@ -96,39 +96,6 @@ export default {
   );
 });
 
-describe("splitCode", () => {
-  it("normal", () =>
-    bundle("split-code", undefined).then(({bundleResult}) => {
-      assert.equal(Object.keys(bundleResult).length, 1);
-      const module = bundleResult.output["entry.js"];
-      assert(module);
-      assert.equal(Object.keys(module.modules).length, 1);
-      assert(module.code.includes("return require"));
-    })
-  );
-  it("hoist", () =>
-    bundle("split-code", {nested: true}).then(({bundleResult}) => {
-      assert.equal(Object.keys(bundleResult).length, 1);
-      const module = bundleResult.output["entry.js"];
-      assert(module);
-      assert.equal(Object.keys(module.modules).length, 2);
-      assert(!module.code.includes("require("));
-    })
-  );
-  it("splitCode", () =>
-    bundle("split-code", {nested: true, splitCode: true}).then(({bundleResult}) => {
-      assert.equal(Object.keys(bundleResult.output).length, 2);
-      const moduleA = bundleResult.output["entry.js"];
-      assert(moduleA);
-      assert.equal(Object.keys(moduleA.modules).length, 1);
-      assert(moduleA.code.includes("return require"));
-      const moduleB = bundleResult.output["foo.js"];
-      assert(moduleB);
-      assert.equal(Object.keys(moduleB.modules).length, 1);
-    })
-  );
-});
-
 describe("export table", () => {
   it("export type unmatched", () =>
     bundle("export-type-unmatched").then(({warns}) => {

@@ -2,18 +2,8 @@ const fs = require("fs");
 const path = require("path");
 
 const {transform: cjsEs} = require("cjs-es");
-const mergeSourceMap = require("merge-source-map");
 const {createFilter} = require("rollup-pluginutils");
 const {analyze: esInfoAnalyze} = require("es-info");
-const {wrapImport} = require("./lib/wrap-import");
-const {unwrapImport} = require("./lib/unwrap-import");
-
-function joinMaps(maps) {
-  while (maps.length > 1) {
-    maps[maps.length - 2] = mergeSourceMap(maps[maps.length - 2], maps.pop());
-  }
-  return maps[0];
-}
 
 function isEsModule(result) {
   return Object.keys(result.import).length ||
@@ -22,35 +12,37 @@ function isEsModule(result) {
     result.export.all;
 }
 
-function factory(options = {}) {
-  let isImportWrapped = false;
-  let parse = null;
+function factory({
+  include = null,
+  exclude = null,
+  cache = true,
+  sourceMap = true,
+  nested = false,
+  exportType = null,
+  _fs = fs
+}) {
   const exportTable = {};
   const exportCache = {};
-  const {_fs = fs} = options;
+  const filter = createFilter(include, exclude);
   
-  if (typeof options.exportType === "object") {
+  if (exportType && typeof exportType === "object") {
     const newMap = {};
-    for (const key of Object.keys(options.exportType)) {
+    for (const key of Object.keys(exportType)) {
       const newKey = path.resolve(key);
-      newMap[newKey] = options.exportType[key];
+      newMap[newKey] = exportType[key];
     }
-    options.exportType = newMap;
+    exportType = newMap;
   }
   
-  if (options.sourceMap == null) {
-    options.sourceMap = true;
-  }
-  
-  if (options.cache == null) {
-    options.cache = true;
-  }
-  
-  const filter = createFilter(options.include, options.exclude);
-  
-  if (options.cache) {
+  if (cache) {
     loadCjsEsCache();
   }
+  
+  return {
+    name: "rollup-plugin-cjs-es",
+    transform,
+    buildEnd
+  };
   
   function loadCjsEsCache() {
     let data;
@@ -82,14 +74,14 @@ function factory(options = {}) {
   }
   
   function getExportTypeFromOptions(id) {
-    if (!options.exportType) {
+    if (!exportType) {
       return;
     }
-    if (typeof options.exportType === "string") {
-      return options.exportType;
+    if (typeof exportType === "string") {
+      return exportType;
     }
-    return typeof options.exportType === "function" ?
-      options.exportType(id) : options.exportType[id];
+    return typeof exportType === "function" ?
+      exportType(id) : exportType[id];
   }
   
   function getExportType(id, importer = null) {
@@ -173,103 +165,52 @@ function factory(options = {}) {
     }
   }
   
-	return {
-    name: "rollup-plugin-cjs-es",
-    transform(code, id) {
-      if (!filter(id)) {
-        return;
-      }
-      parse = this.parse;
-      let ast = parse(code);
-      const guessExportType = new Set;
-      const info = esInfoAnalyze(ast);
-      if (isEsModule(info)) {
-        return updateExportTable({context: this, info, id, guessExportType})
-          .then(() => undefined);
-      }
-      const maps = [];
-      let isTouched;
-      if (options.splitCode) {
-        const result = wrapImport({
-          code,
-          parse,
-          ast,
-          shouldSplitCode: importee => {
-            if (typeof options.splitCode === "function") {
-              return options.splitCode(id, importee);
-            }
-            return false;
-          }
-        });
-        if (result.isTouched) {
-          code = result.code;
-          maps.push(result.map);
-          isImportWrapped = true;
-          isTouched = true;
-          ast = null;
-        }
-      }
-      return cjsEs({
-        code,
-        parse,
-        ast,
-        sourceMap: options.sourceMap,
-        importStyle: requireId => 
-          this.resolveId(requireId, id)
-            .then(newId => {
-              guessExportType.add(newId || requireId);
-              return getExportType(newId || requireId, id);
-            }),
-        exportStyle: () => {
-          guessExportType.add(id);
-          return getExportType(id);
-        },
-        nested: options.nested,
-        warn: (message, pos) => {
-          this.warn(message, pos);
-        }
-      })
-        .then(result => {
-          if (result.isTouched) {
-            code = result.code;
-            maps.push(result.map);
-            isTouched = true;
-            ast = null;
-          }
-          if (isTouched) {
-            return updateExportTable({context: this, code, id, guessExportType})
-              .then(() => ({
-                code,
-                map: options.sourceMap && maps.length && joinMaps(maps)
-              }));
-          }
-        });
-    },
-    transformChunk(code, {format}) {
-      if (!isImportWrapped) {
-        return;
-      }
-      if (format !== "cjs") {
-        throw new Error("`format` must be 'cjs'");
-      }
-      const result = unwrapImport({
-        code,
-        parse,
-        sourceMap: options.sourceMap
-      });
-      if (result.isTouched) {
-        return {
-          code: result.code,
-          map: result.map
-        };
-      }
-    },
-    buildEnd() {
-      if (options.cache) {
-        writeCjsEsCache();
-      }
+	function transform(code, id) {
+    if (!filter(id)) {
+      return;
     }
-  };
+    const ast = this.parse(code);
+    const guessExportType = new Set;
+    const info = esInfoAnalyze(ast);
+    if (isEsModule(info)) {
+      return updateExportTable({context: this, info, id, guessExportType})
+        .then(() => undefined);
+    }
+    return cjsEs({
+      code,
+      ast,
+      sourceMap,
+      importStyle: requireId => 
+        this.resolveId(requireId, id)
+          .then(newId => {
+            guessExportType.add(newId || requireId);
+            return getExportType(newId || requireId, id);
+          }),
+      exportStyle: () => {
+        guessExportType.add(id);
+        return getExportType(id);
+      },
+      nested,
+      warn: (message, pos) => {
+        this.warn(message, pos);
+      }
+    })
+      .then(({code, map, isTouched}) => {
+        if (isTouched) {
+          return updateExportTable({context: this, code, id, guessExportType})
+            .then(() => ({
+              code,
+              map
+            }));
+        }
+      });
+  }
+  
+  function buildEnd() {
+    if (cache) {
+      writeCjsEsCache();
+    }
+  }
 }
 
 module.exports = factory;

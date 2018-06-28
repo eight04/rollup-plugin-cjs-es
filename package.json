@@ -34,7 +34,6 @@
     "es-info": "^0.1.1",
     "estree-walker": "^0.5.2",
     "magic-string": "^0.25.0",
-    "merge-source-map": "^1.1.0",
     "rollup-pluginutils": "^2.3.0"
   },
   "peerDependencies": {
