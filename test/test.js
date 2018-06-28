@@ -155,4 +155,19 @@ describe("cache", () => {
         assert.equal(warns.length, 0);
       });
   });
+  
+  it("options has higher priority even if it makes no sense", () => {
+    const fs = prepareFs();
+    const exportType = (id) => id === "external" ? "default" : null;
+    return bundle("es-disagree-external-default", {cache: true, _fs: fs, exportType})
+      .then(({warns}) => {
+        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
+        assert.equal(warns.length, 1);
+        return bundle("es-disagree-external-default", {cache: true, _fs: fs, exportType});
+      })
+      .then(({warns}) => {
+        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
+        assert.equal(warns.length, 1);
+      });
+  });
 });
