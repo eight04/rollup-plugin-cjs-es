@@ -60,17 +60,22 @@ function factory(options = {}) {
       return;
     }
     data = JSON.parse(data);
-    for (const [id, type] of Object.entries(data)) {
-      exportCache[path.resolve(id)] = type;
+    for (const [id, expectBy] of Object.entries(data)) {
+      exportCache[path.resolve(id)] = expectBy ? path.resolve(expectBy) : null;
     }
   }
   
   function writeCjsEsCache() {
-    const data = Object.entries(exportTable).filter(e => e[1].trusted || e[1].external)
+    const data = Object.entries(exportTable).filter(([, i]) => i.default && (i.trusted || i.external))
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .reduce((output, [id, info]) => {
+      .reduce((output, [id, {expectBy}]) => {
+        if (expectBy === id) {
+          expectBy = null;
+        } else {
+          expectBy = path.relative(".", expectBy).replace(/\\/g, "/");
+        }
         id = path.relative(".", id).replace(/\\/g, "/");
-        output[id] = info.named ? "named" : "default";
+        output[id] = expectBy;
         return output;
       }, {});
     _fs.writeFileSync(".cjsescache", JSON.stringify(data, null, 2), "utf8");
@@ -87,27 +92,25 @@ function factory(options = {}) {
       options.exportType(id) : options.exportType[id];
   }
   
-  function getExportType(id) {
-    // get export type from trusted table
-    if (exportTable[id] && exportTable[id].trusted) {
-      return exportTable[id].named ? "named" : "default";
-    }
+  function getExportType(id, importer = null) {
     // get export type from options
     return Promise.resolve(getExportTypeFromOptions(id))
       .then(result => {
         if (result) {
           return result;
         }
-        // get export type from guess table
-        if (exportTable[id]) {
+        // get export type from trusted table
+        if (exportTable[id] && exportTable[id].trusted) {
           return exportTable[id].named ? "named" : "default";
         }
-        // get export type from cache
-        return exportCache[id];
+        // check if id is in preferDefault cache
+        if (exportCache.hasOwnProperty(id) && exportCache[id] !== importer) {
+          return "default";
+        }
       });
   }
   
-  function updateExportTable({id, code, context, info}) {
+  function updateExportTable({id, code, context, info, guessExportType}) {
     if (!info) {
       info = esInfoAnalyze(context.parse(code));
     }
@@ -119,12 +122,15 @@ function factory(options = {}) {
         warnExport("names");
       }
     }
-    exportTable[id] = {
-      default: info.default,
-      named: info.export.named.length > 0 || info.all,
-      expectBy: id,
-      trusted: true
-    };
+    if (!exportTable[id] || !guessExportType.has(id)) {
+      const exportInfo = info.export;
+      exportTable[id] = {
+        default: exportInfo.default,
+        named: exportInfo.named.length > 0 || exportInfo.all,
+        expectBy: id,
+        trusted: !guessExportType.has(id)
+      };
+    }
     return Promise.all(Object.entries(info.import).map(([name, importInfo]) => {
       return context.resolveId(name, id)
         .then(importee => {
@@ -140,16 +146,15 @@ function factory(options = {}) {
             if (exportTable[importee].named && !importInfo.named.length && !importInfo.all) {
               warnImport(importee, "names");
             }
-          } else {
-            const newGuess = {
+          }
+          if (!exportTable[importee] || !guessExportType.has(importee)) {
+            exportTable[importee] = {
               default: importInfo.default,
               named: importInfo.named.length > 0 || importInfo.all,
               expectBy: id,
-              external
+              external,
+              trusted: !guessExportType.has(importee)
             };
-            if (newGuess.default || newGuess.named) {
-              exportTable[importee] = newGuess;
-            }
           }
         });
     }));
@@ -176,9 +181,10 @@ function factory(options = {}) {
       }
       parse = this.parse;
       let ast = parse(code);
+      const guessExportType = new Set;
       const info = esInfoAnalyze(ast);
       if (isEsModule(info)) {
-        return updateExportTable({context: this, info, id})
+        return updateExportTable({context: this, info, id, guessExportType})
           .then(() => undefined);
       }
       const maps = [];
@@ -210,8 +216,14 @@ function factory(options = {}) {
         sourceMap: options.sourceMap,
         importStyle: requireId => 
           this.resolveId(requireId, id)
-            .then(newId => getExportType(newId || requireId)),
-        exportStyle: () => getExportTypeFromOptions(id),
+            .then(newId => {
+              guessExportType.add(newId || requireId);
+              return getExportType(newId || requireId, id);
+            }),
+        exportStyle: () => {
+          guessExportType.add(id);
+          return getExportType(id);
+        },
         nested: options.nested,
         warn: (message, pos) => {
           this.warn(message, pos);
@@ -225,7 +237,7 @@ function factory(options = {}) {
             ast = null;
           }
           if (isTouched) {
-            return updateExportTable({context: this, code, id})
+            return updateExportTable({context: this, code, id, guessExportType})
               .then(() => ({
                 code,
                 map: options.sourceMap && maps.length && joinMaps(maps)

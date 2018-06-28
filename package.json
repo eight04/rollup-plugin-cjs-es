@@ -24,13 +24,13 @@
   "license": "MIT",
   "devDependencies": {
     "coveralls": "^3.0.1",
-    "eslint": "^4.19.1",
+    "eslint": "^5.0.1",
     "mocha": "^5.2.0",
     "nyc": "^12.0.2",
-    "rollup": "^0.60.7"
+    "rollup": "^0.62.0"
   },
   "dependencies": {
-    "cjs-es": "^0.4.7",
+    "cjs-es": "^0.4.9",
     "es-info": "^0.1.1",
     "estree-walker": "^0.5.2",
     "magic-string": "^0.25.0",

@@ -139,10 +139,10 @@ describe("export table", () => {
   );
   
   it("export type unmatched default", () =>
+    // marking `require("./foo.js")` as `// default` makes `foo.js` export the default member.
     bundle("export-type-unmatched-default").then(({warns}) => {
       warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
-      assert.equal(warns.length, 1);
-      assert(/foo\.js' doesn't export default expected by.+?entry\.js/.test(warns[0].message));
+      assert.equal(warns.length, 0);
     })
   );
   
@@ -164,7 +164,7 @@ describe("export table", () => {
 });
 
 describe("cache", () => {
-  it("use cache", () => {
+  function prepareFs() {
     const files = {};
     const fs = {
       readFileSync(file) {
@@ -175,8 +175,14 @@ describe("cache", () => {
       },
       writeFileSync(file, data) {
         files[file] = data;
-      }
+      },
+      files
     };
+    return fs;
+  }
+  
+  it("use cache", () => {
+    const fs = prepareFs();
     return bundle("export-type-unmatched", {cache: true, _fs: fs})
       .then(({warns}) => {
         warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
