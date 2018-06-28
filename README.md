@@ -3,6 +3,7 @@ rollup-plugin-cjs-es
 
 [![Build Status](https://travis-ci.org/eight04/rollup-plugin-cjs-es.svg?branch=master)](https://travis-ci.org/eight04/rollup-plugin-cjs-es)
 [![Coverage Status](https://coveralls.io/repos/github/eight04/rollup-plugin-cjs-es/badge.svg?branch=master)](https://coveralls.io/github/eight04/rollup-plugin-cjs-es?branch=master)
+[![install size](https://packagephobia.now.sh/badge?p=rollup-plugin-cjs-es)](https://packagephobia.now.sh/result?p=rollup-plugin-cjs-es)
 
 Convert CommonJS module into ES module. Powered by [cjs-es](https://github.com/eight04/cjs-es).
 
@@ -16,7 +17,8 @@ npm install -D rollup-plugin-cjs-es
 Features
 --------
 
-* Transform some cases and emit warnings for unconverted `require`s.
+* Transform typical cases.
+* Emit warnings for unconverted `require`s.
 * Use a cache file to solve export type conflicts instead of using proxy modules.
 * Split code with sync `require()` or async `Promise.resolve(require())`.
 
@@ -43,7 +45,7 @@ export default {
 Compatibility
 -------------
 
-`cjs-es` can transform top-level `require`, `exports`, and `module.exports` statements. For those non-top-level statements, the transformer hoist them to top-level:
+`cjs-es` can transform top-level `require`, `exports`, and `module.exports` statements into `import` and `export`. For those non-top-level statements, the transformer hoist them to top-level:
 
 ```js
 const baz = require("foo").bar.baz;
@@ -76,12 +78,12 @@ const r = require;
 r("foo");
 ```
 
-These patterns are common in module loaders like UMD. I suggest using other plugin to unwrap the module back to normal CJS pattern.
+These patterns are common in module loaders like UMD. I suggest using other plugins to unwrap the module back to the normal CJS pattern.
 
 Lazy load and code splitting
 ----------------------------
 
-To lazy load an ES module, we can use `import()` function:
+To lazy load an ES module, we can use the `import()` function:
 
 *foo.js*
 ```js
@@ -119,7 +121,7 @@ exports.bar = bar;
 
 So that `bar.js` is not loaded until `require("foo").foo()` is called.
 
-With this plugin, you can use the same feature in CommonJS syntax, by writing the require statement inside a promise i.e. `Promise.resolve(require("..."))`:
+With this plugin, you can use the same feature with CommonJS syntax, by writing the require statement inside a promise:
 
 ```js
 module.exports = {
@@ -129,7 +131,7 @@ module.exports = {
 };
 ```
 
-Or, by adding a special comment `// split` if you can't use async function (must set `options.splitCode` to `true`):
+Or, by adding a special comment `// split` if you have to load it synchronously (must set `options.splitCode` to `true`):
 
 ```js
 module.exports = {
@@ -139,7 +141,7 @@ module.exports = {
 };
 ```
 
-Note that in the later form, the result is a sync `require` function call, which means **the output format must be `cjs`**.
+Note that in the later form, the result is a sync `require` function call, which means that **the output format must be `cjs`**.
 
 Named import/export v.s. default import/export
 ----------------------------------------------
@@ -185,9 +187,10 @@ You can also use `exportType` option to tell the plugin that *foo.js* exports de
   plugins: [
     cjsEs({
       exportType: {
-        "path/to/foo.js": "default"
+        // the path would be resolved with the current directory.
+        "foo.js": "default"
       }
-    })  
+    })
   ]
 }
 ```
@@ -317,14 +320,17 @@ foo.foo();
 
 > Note that this won't be true after rollup supports tree-shaking for object literal. See https://github.com/rollup/rollup/issues/2201
 
-API reference
--------------
+API
+----
 
 This module exports a single function.
 
-### cjsEsFactory(options?: object): RollupPlugin object
+### cjsEsFactory
+```js
+cjsEsFactory(options?:Object) => rollupPlugin
+```
 
-`options` may have following optional properties:
+`options` has following optional properties:
 
 * `include`: `Array<string>`. A list of minimatch pattern. Only matched files would be transformed. Match all files by default.
 * `exclude`: `Array<string>`. A list of minimatch pattern. Override `options.include`. Default: `[]`.
@@ -341,18 +347,20 @@ This module exports a single function.
   
   Default: `false`
   
-* `nested?`: `boolean`. If true then analyze the AST recursively, otherwise only top-level nodes are analyzed. Default: `false`.
-* `exportType`: `string|object|function`. Tell the plugin how to determine the export type.
+* `nested`: `boolean`. If true then analyze the AST recursively, otherwise only top-level nodes are analyzed. Default: `false`.
+* `exportType`: `null|string|object|function`. Tell the plugin how to determine the export type. Valid export types are `"named"`, `"default"`.
 
-  If `exportType` is a function, it receives 1 argument:
+  If `exportType` is a function, it has following signature:
   
-  - `modulId`: `string`. The ID of the module.
+  ```js
+  (moduleId) => exportType:String|null|Promise<String|null>
+  ```
   
-  The return value should be the type of export for `moduleId`.
+  The return value should be the export type of `moduleId`.
   
   If `exportType` is an object, it is a `"path/to/file.js": type` map.
   
-  Default: `"named"`.
+  Default: `null`.
 
 Changelog
 ---------
