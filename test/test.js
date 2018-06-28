@@ -164,7 +164,7 @@ describe("export table", () => {
 });
 
 describe("cache", () => {
-  it("use cache", () => {
+  function prepareFs() {
     const files = {};
     const fs = {
       readFileSync(file) {
@@ -177,11 +177,30 @@ describe("cache", () => {
         files[file] = data;
       }
     };
+    return fs;
+  }
+  
+  it("use cache", () => {
+    const fs = prepareFs();
     return bundle("export-type-unmatched", {cache: true, _fs: fs})
       .then(({warns}) => {
         warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
         assert.equal(warns.length, 1);
         return bundle("export-type-unmatched", {cache: true, _fs: fs});
+      })
+      .then(({warns}) => {
+        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
+        assert.equal(warns.length, 0);
+      });
+  });
+  
+  it("unmatched default", () => {
+    const fs = prepareFs();
+    return bundle("export-type-unmatched-default", {cache: true, _fs: fs})
+      .then(({warns}) => {
+        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
+        assert.equal(warns.length, 1);
+        return bundle("export-type-unmatched-default", {cache: true, _fs: fs});
       })
       .then(({warns}) => {
         warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
