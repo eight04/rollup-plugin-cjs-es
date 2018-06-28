@@ -26,7 +26,7 @@ Usage
 -----
 
 ```js
-import cjsEs from "rollup-plugin-cjs-es"
+import cjs from "rollup-plugin-cjs-es";
 
 export default {
   input: ["entry.js"],
@@ -35,7 +35,7 @@ export default {
     format: "cjs"
   },
   plugins: [
-    cjsEs({
+    cjs({
       nested: true
     })
   ]
