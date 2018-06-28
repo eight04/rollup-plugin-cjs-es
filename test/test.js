@@ -143,7 +143,6 @@ describe("export table", () => {
     bundle("export-type-unmatched-default").then(({warns}) => {
       warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
       assert.equal(warns.length, 0);
-      // assert(/foo\.js' doesn't export default expected by.+?entry\.js/.test(warns[0].message));
     })
   );
   
@@ -184,7 +183,6 @@ describe("cache", () => {
   
   it("use cache", () => {
     const fs = prepareFs();
-    // debugger;
     return bundle("export-type-unmatched", {cache: true, _fs: fs})
       .then(({warns}) => {
         warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
