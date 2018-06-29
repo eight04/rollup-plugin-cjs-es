@@ -21,6 +21,7 @@ function factory({
   exportType = null,
   _fs = fs
 }) {
+  const exportTypeCache = {};
   const exportTable = {};
   const exportCache = {};
   const filter = createFilter(include, exclude);
@@ -81,8 +82,19 @@ function factory({
     if (typeof exportType === "string") {
       return exportType;
     }
-    return typeof exportType === "function" ?
-      exportType(id) : exportType[id];
+    if (typeof exportType === "object") {
+      return exportType[id];
+    }
+    if (exportTypeCache.hasOwnProperty(id)) {
+      return exportTypeCache[id];
+    }
+    return Promise.resolve(exportType(id))
+      .then(result => {
+        if (result) {
+          exportTypeCache[id] = result;
+        }
+        return result;
+      });
   }
   
   function getExportType(id, importer = null) {
