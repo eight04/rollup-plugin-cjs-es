@@ -250,4 +250,20 @@ describe("export table", () => {
       `);
     })
   );
+  
+  it("unexpected warning", () =>
+    withDir(`
+      - entry.js: |
+          require("./foo");
+          require("./bar");
+      - foo.js: |
+          export function foo() {}
+          export default "foo";
+      - bar.js: |
+          const {foo} = require("./foo");
+    `, async resolve => {
+      const {warns} = await bundle(resolve("entry.js"));
+      assert.equal(warns.length, 0);
+    })
+  );
 });
