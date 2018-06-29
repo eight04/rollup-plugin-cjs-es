@@ -266,4 +266,23 @@ describe("export table", () => {
       assert.equal(warns.length, 0);
     })
   );
+  
+  it("unexpected warning 2", () =>
+    withDir(`
+      - entry.js: |
+          require("./bar");
+          require("./baz");
+      - foo.js: |
+          export const foo = "foo";
+          export default () => {};
+      - bar.js: |
+          const {foo} = require("./foo");
+      - baz.js: |
+          const foo = require("./foo");
+          foo();
+    `, async resolve => {
+      const {warns} = await bundle(resolve("entry.js"));
+      assert.equal(warns.length, 0);
+    })
+  );
 });
