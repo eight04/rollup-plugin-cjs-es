@@ -24,17 +24,19 @@
   "license": "MIT",
   "devDependencies": {
     "coveralls": "^3.0.1",
+    "endent": "^1.1.1",
     "eslint": "^5.0.1",
     "mocha": "^5.2.0",
     "nyc": "^12.0.2",
-    "rollup": "^0.62.0"
+    "rollup": "^0.62.0",
+    "sinon": "^6.0.1",
+    "tempdir-yaml": "^0.2.1"
   },
   "dependencies": {
     "cjs-es": "^0.4.9",
     "es-info": "^0.1.1",
     "estree-walker": "^0.5.2",
     "magic-string": "^0.25.0",
-    "merge-source-map": "^1.1.0",
     "rollup-pluginutils": "^2.3.0"
   },
   "peerDependencies": {
