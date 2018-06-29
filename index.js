@@ -145,10 +145,10 @@ function factory({
             external = true;
           }
           if (exportTable[importee]) {
-            if (exportTable[importee].default && !importInfo.default) {
+            if (importInfo.default && !exportTable[importee].default) {
               warnImport(importee, "default");
             }
-            if (exportTable[importee].named && !importInfo.named.length && !importInfo.all) {
+            if ((importInfo.named.length || importInfo.all) && !exportTable[importee].named) {
               warnImport(importee, "names");
             }
           }
@@ -168,7 +168,7 @@ function factory({
       const shortId = path.relative(".", id);
       const shortImportee = path.relative(".", importee);
       const expectBy = path.relative(".", exportTable[importee].expectBy);
-      context.warn(`'${expectBy}' thinks '${shortImportee}' export ${type} but '${shortId}' disagrees`);
+      context.warn(`'${shortId}' expects '${shortImportee}' to export ${type} but ${expectBy} doesn't`);
     }
     
     function warnExport(type) {
