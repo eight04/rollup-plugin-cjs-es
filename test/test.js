@@ -1,173 +1,217 @@
 /* eslint-env mocha */
 const assert = require("assert");
-const cjsEs = require("..");
 const rollup = require("rollup");
+const {withDir} = require("tempdir-yaml");
+const endent = require("endent");
+const sinon = require("sinon");
 
-function bundle(dir, options) {
-  const codes = [];
+const cjsEs = require("..");
+
+async function bundle(file, options) {
   const warns = [];
-  return rollup.rollup({
-    input: [`${__dirname}/fixtures/${dir}/entry.js`],
+  const bundle = await rollup.rollup({
+    input: [file],
     plugins: [
-      cjsEs(Object.assign({cache: false}, options)),
-      {transform(code) {
-        codes.push(code.replace(/\r/g, ""));
-      }}
+      cjsEs(Object.assign({cache: false}, options))
     ],
     experimentalCodeSplitting: true,
     onwarn(warn) {
-      warns.push(warn);
+      if (warn.plugin === "rollup-plugin-cjs-es") {
+        warns.push(warn);
+      }
     }
-  })
-    .then(bundle => bundle.generate({
-      format: "cjs",
-      legacy: true,
-      freeze: false,
-      sourcemap: true
-    }))
-    .then(bundleResult => ({codes, warns, bundleResult}));
+  });
+  const modules = bundle.cache.modules.slice();
+  const result = await bundle.generate({
+    format: "es",
+    legacy: true,
+    freeze: false,
+    sourcemap: true
+  });
+  result.warns = warns;
+  result.modules = modules;
+  return result;
 }
 
-describe("exportType", () => {
-  const entryImportNamed = 'import * as foo from "./foo"';
-  const entryImportDefault = 'import foo from "./foo"';
-  const entryExportNamed = "export {foo}";
-  const entryExportDefault = "export default {foo}";
-  const fooExportNamed = `
-const _export_foo_ = () => console.log("foo");
-export {_export_foo_ as foo};
-  `.trim();
-  const fooExportDefault = `
-export default {
-  foo: () => console.log("foo")
-};
-  `.trim();
-  it("named", () => 
-    bundle("export-type", {exportType: "named"})
-      .then(({codes: [entry, foo]}) => {
-        assert(entry.includes(entryImportNamed));
-        assert(entry.includes(entryExportNamed));
-        assert(foo.includes(fooExportNamed));
-      })
+describe("exportType option", () => {
+  it("named", () =>
+    withDir(`
+      - entry.js: |
+          const foo = require("foo");
+          module.exports = {foo};
+    `, async resolve => {
+      const {output} = await bundle(resolve("entry.js"));
+      const {output: output2} = await bundle(resolve("entry.js"), {exportType: "named"});
+      assert.equal(output["entry.js"].code, output2["entry.js"].code);
+      assert.equal(output["entry.js"].code.trim(), endent`
+        import * as foo from 'foo';
+        export { foo };
+      `);
+    })
   );
+  
   it("default", () =>
-    bundle("export-type", {exportType: "default"})
-      .then(({codes: [entry, foo]}) => {
-        assert(entry.includes(entryImportDefault));
-        assert(entry.includes(entryExportDefault));
-        assert(foo.includes(fooExportDefault));
-      })
+    withDir(`
+      - entry.js: |
+          const foo = require("foo");
+          module.exports = {foo};
+    `, async resolve => {
+      const {output} = await bundle(resolve("entry.js"), {exportType: "default"});
+      assert.equal(output["entry.js"].code.trim(), endent`
+        import foo from 'foo';
+        
+        var entry = {foo};
+        
+        export default entry;
+      `);
+    })
   );
-  it("function", () => {
-    let fooCount = 0;
-    return bundle(
-      "export-type",
-      {exportType: (moduleId) => {
-        if (moduleId.endsWith("entry.js")) {
+  
+  it("function", () =>
+    withDir(`
+      - entry.js: |
+          const foo = require("./foo");
+          module.exports = {foo};
+      - foo.js: |
+          module.exports = {
+            foo: "FOO"
+          };
+    `, async resolve => {
+      const exportType = sinon.spy(id => {
+        if (id.endsWith("entry.js")) {
           return "named";
         }
-        if (moduleId.endsWith("foo.js")) {
-          fooCount++;
-          assert(fooCount <= 2);
-          return "default";
-        }
-        throw new Error(`Unknown moduleId ${moduleId}`);
-      }}
-    )
-      .then(({codes: [entry, foo]}) => {
-        assert(entry.includes(entryImportDefault));
-        assert(entry.includes(entryExportNamed));
-        assert(foo.includes(fooExportDefault));
-        assert.equal(fooCount, 2);
+        return "default";
       });
-  });
+      const {output} = await bundle(resolve("entry.js"), {exportType});
+      assert.equal(exportType.callCount, 2);
+      assert.equal(output["entry.js"].code.trim(), endent`
+        var foo = {
+          foo: "FOO"
+        };
+        
+        export { foo };
+      `);
+    })
+  );
+    
   it("object map", () =>
-    bundle("export-type", 
-      {exportType: {
-        "./test/fixtures/export-type/foo.js": "default",
-        "./test/fixtures/export-type/entry.js": "named"
-      }}
-    )
-      .then(({codes: [entry, foo]}) => {
-        assert(entry.includes(entryImportDefault));
-        assert(entry.includes(entryExportNamed));
-        assert(foo.includes(fooExportDefault));
-      })
+    withDir(`
+      - entry.js: |
+          const foo = require("./foo");
+          module.exports = {foo};
+      - foo.js: |
+          module.exports = {
+            foo: "FOO"
+          };
+    `, async resolve => {
+      const exportType = {
+        [resolve("entry.js")]: "default",
+        [resolve("foo.js")]: "named"
+      };
+      const {output} = await bundle(resolve("entry.js"), {exportType});
+      assert.equal(output["entry.js"].code.trim(), endent`
+        const _export_foo_ = "FOO";
+        
+        var foo = ({
+          foo: _export_foo_
+        });
+        
+        var entry = {foo};
+        
+        export default entry;
+      `);
+    })
   );
 });
 
-describe("cache", () => {
-  function prepareFs() {
-    const files = {};
-    const fs = {
-      readFileSync(file) {
-        if (!files[file]) {
-          throw new Error("not found");
-        }
-        return files[file];
-      },
-      writeFileSync(file, data) {
-        files[file] = data;
-      },
-      files
-    };
-    return fs;
-  }
+describe("unmatched export type", () => {
+  it("import default if dep exports default", () =>
+    withDir(`
+      - entry.js: |
+          const foo = require("./foo");
+      - foo.js: |
+          module.exports = "foo";
+    `, async resolve => {
+      let warns;
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 1);
+      assert(/foo\.js.*? doesn't export names expected by .*?entry\.js/.test(warns[0].message));
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
+    })
+  );
   
-  it("hoisted default export should be trusted", () => {
-    const fs = prepareFs();
-    return bundle("cjs-import-default", {cache: true, _fs: fs})
-      .then(({warns}) => {
-        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
-        assert.equal(warns.length, 1);
-        return bundle("cjs-import-default", {cache: true, _fs: fs});
-      })
-      .then(({warns}) => {
-        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
-        assert.equal(warns.length, 0);
-      });
-  });
+  it("import default if others import default", () =>
+    withDir(`
+      - entry.js: |
+          const foo = require("external");
+          require("./foo");
+      - foo.js: |
+          import foo from "external";
+    `, async resolve => {
+      const {warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
+      assert.equal(warns.length, 1);
+      assert(/entry\.js' thinks .*?external' export names but .*?foo\.js' disagree/.test(warns[0].message));
+      
+      const {warns: warns2} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
+      assert.equal(warns2.length, 0);
+    })
+  );
   
-  it("es module should be trusted", () => {
-    const fs = prepareFs();
-    return bundle("es-import-cjs", {cache: true, _fs: fs})
-      .then(({warns}) => {
-        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
-        assert.equal(warns.length, 2);
-        return bundle("es-import-cjs", {cache: true, _fs: fs});
-      })
-      .then(({warns}) => {
-        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
-        assert.equal(warns.length, 0);
-      });
-  });
+  it("import names but others import default (bad config)", () =>
+    withDir(`
+      - entry.js: |
+          const foo = require("./foo");
+      - foo.js: |
+          export const foo = "foo";
+    `, async resolve => {
+      const exportType = (id) => id.endsWith("foo.js") ? "default" : null;
+      let warns;
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
+      assert.equal(warns.length, 1);
+      assert(/foo\.js' doesn't export default expected by .*?entry\.js/.test(warns[0].message));
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
+      assert.equal(warns.length, 1);
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
+    })
+  );
   
-  it("es module should be trusted (disagree external)", () => {
-    const fs = prepareFs();
-    return bundle("es-disagree-external", {cache: true, _fs: fs})
-      .then(({warns}) => {
-        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
-        assert.equal(warns.length, 1);
-        return bundle("es-disagree-external", {cache: true, _fs: fs});
-      })
-      .then(({warns}) => {
-        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
-        assert.equal(warns.length, 0);
-      });
-  });
+  it("import default but others import names (bad config)", () =>
+    withDir(`
+      - entry.js: |
+          const foo = require("external");
+          require("./foo.js");
+      - foo.js: |
+          import {foo} from "external";
+    `, async resolve => {
+      const exportType = (id) => id === "external" ? "default" : null;
+      let warns;
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
+      assert.equal(warns.length, 1);
+      assert(/entry\.js' thinks .*?external' export default but .*?foo\.js' disagree/.test(warns[0].message));
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
+      assert.equal(warns.length, 1);
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
+    })
+  );
   
-  it("options has higher priority even if it makes no sense", () => {
-    const fs = prepareFs();
-    const exportType = (id) => id === "external" ? "default" : null;
-    return bundle("es-disagree-external-default", {cache: true, _fs: fs, exportType})
-      .then(({warns}) => {
-        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
-        assert.equal(warns.length, 1);
-        return bundle("es-disagree-external-default", {cache: true, _fs: fs, exportType});
-      })
-      .then(({warns}) => {
-        warns = warns.filter(w => w.plugin == "rollup-plugin-cjs-es");
-        assert.equal(warns.length, 1);
-      });
-  });
+  it("export default if others import default", () =>
+    withDir(`
+      - entry.js: |
+          import foo from "./foo";
+      - foo.js: |
+          exports.foo = "foo";
+    `, async resolve => {
+      const {warns, modules} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
+      assert.equal(warns.length, 0);
+      assert.equal(modules[1].code.trim(), endent`
+        let _exports_ = {};
+        _exports_.foo = "foo";
+        export default _exports_;
+      `);
+    })
+  );
 });
