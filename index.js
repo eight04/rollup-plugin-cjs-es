@@ -60,12 +60,28 @@ function factory({
   }
   
   function writeCjsEsCache() {
-    const data = Object.entries(exportTable).filter(([, i]) => i.default && (i.trusted || i.external))
+    const data = Object.entries(exportTable)
+      .map(([id, info]) => {
+        if (info.loaded && info.default && info.trusted) {
+          return {
+            id,
+            expectBy: null
+          };
+        }
+        if (info.expects) {
+          const trustedExpect = info.expects.find(e => e.trusted);
+          if (trustedExpect && trustedExpect.default) {
+            return {
+              id,
+              expectBy: trustedExpect.id
+            };
+          }
+        }
+      })
+      .filter(Boolean)
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .reduce((output, [id, {expectBy}]) => {
-        if (expectBy === id) {
-          expectBy = null;
-        } else {
+      .reduce((output, [{id, expectBy}]) => {
+        if (expectBy) {
           expectBy = path.relative(".", expectBy).replace(/\\/g, "/");
         }
         id = path.isAbsolute(id) ? path.relative(".", id).replace(/\\/g, "/") : `~${id}`;
@@ -104,8 +120,8 @@ function factory({
         if (result) {
           return result;
         }
-        // get export type from trusted table
-        if (exportTable[id] && exportTable[id].trusted) {
+        // get export type from loaded table
+        if (exportTable[id] && exportTable[id].loaded) {
           return exportTable[id].named ? "named" : "default";
         }
         // check if id is in preferDefault cache
@@ -119,24 +135,29 @@ function factory({
     if (!info) {
       info = esInfoAnalyze(context.parse(code));
     }
-    if (exportTable[id]) {
-      if (exportTable[id].default && !info.export.default) {
-        warnExport("default");
-      }
-      if (exportTable[id].named && !info.export.named.length && !info.export.all) {
-        warnExport("names");
+    if (!exportTable[id]) {
+      exportTable[id] = {id};
+    }
+    exportTable[id].loaded = true;
+    exportTable[id].default = exportInfo.default;
+    exportTable[id].named = exportInfo.named.length > 0 || exportInfo.all;
+    exportTable[id].trusted = !guessExportType.has(id);
+    
+    if (exportTable[id].expects) {
+      for (const expect of exportTable[id].expects) {
+        checkExpect(expect, exportTable[id]);
       }
     }
-    if (!exportTable[id] || !guessExportType.has(id)) {
-      const exportInfo = info.export;
-      exportTable[id] = {
-        default: exportInfo.default,
-        named: exportInfo.named.length > 0 || exportInfo.all,
-        expectBy: id,
-        trusted: !guessExportType.has(id)
-      };
-    }
+    
     return Promise.all(Object.entries(info.import).map(([name, importInfo]) => {
+      const expect = {
+        id,
+        default: importInfo.default,
+        named: importInfo.named.length || importInfo.all
+      };
+      if (!expect.default && !expect.named) {
+        return;
+      }
       return context.resolveId(name, id)
         .then(importee => {
           let external = false;
@@ -144,37 +165,61 @@ function factory({
             importee = name;
             external = true;
           }
-          if (exportTable[importee]) {
-            if (importInfo.default && !exportTable[importee].default) {
-              warnImport(importee, "default");
+          if (!exportTable[importee]) {
+            exportTable[importee] = {id: importee};
+          }
+          if (!exportTable[importee].expects) {
+            exportTable[importee].expects = [];
+          }
+          expect.trusted = !guessExportType.has(importee);
+          expect.external = external;
+          if (exportTable[importee].loaded) {
+            checkExpect(expect, exportTable[importee]);
+          }
+          for (const otherExpect of exportTable[importee].expects) {
+            if (expect.default && !otherExpect.default) {
+              warnUnmatchedImport(expect.id, otherExpect.id, "default", importee);
             }
-            if ((importInfo.named.length || importInfo.all) && !exportTable[importee].named) {
-              warnImport(importee, "names");
+            if (expect.named && !otherExpect.named) {
+              warnUnmatchedImport(expect.id, otherExpect.id, "names", importee);
             }
           }
-          if (!exportTable[importee] || !guessExportType.has(importee)) {
-            exportTable[importee] = {
-              default: importInfo.default,
-              named: importInfo.named.length > 0 || importInfo.all,
-              expectBy: id,
-              external,
-              trusted: !guessExportType.has(importee)
-            };
-          }
+          exportTable[importee].expects.push(expect);
         });
     }));
     
-    function warnImport(importee, type) {
-      const shortId = path.relative(".", id);
-      const shortImportee = path.relative(".", importee);
-      const expectBy = path.relative(".", exportTable[importee].expectBy);
-      context.warn(`'${shortId}' expects '${shortImportee}' to export ${type} but ${expectBy} doesn't`);
+    function checkExpect(expect, exportInfo) {
+      if (expect.default && !exportInfo.default) {
+        warnMissingExport(expect.id, "default", exportInfo.id);
+      }
+      if (expect.named && && !exportInfo.named) {
+        warnMissingExport(expect.id, "names", exportInfo.id);
+      }
     }
     
-    function warnExport(type) {
-      const shortId = path.relative(".", id);
-      const expectBy = path.relative(".", exportTable[id].expectBy);
-      context.warn(`'${shortId}' doesn't export ${type} expected by '${expectBy}'`);
+    function warnUnmatchedImport(importer, otherImporter, type, importee) {
+      context.warn({
+        code: "CJS_ES_UNMATCHED_IMPORT",
+        message: `'${r(importer)}' expects '${r(importee)}' to export ${type} but ${r(otherImporter)} doesn't`,
+        importer,
+        importerExpect: type,
+        otherImporter,
+        importee
+      });
+    }
+    
+    function warnMissingExport(importer, type, exporter) {
+      context.warn({
+        code: "CJS_ES_MISSING_EXPORT",
+        message: `'${r(exporter)}' doesn't export ${type} expected by '${r(importer)}'`
+        importer,
+        importerExpect: type,
+        exporter
+      });
+    }
+    
+    function r(id) {
+      return path.relative(".", id);
     }
   }
   
