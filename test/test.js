@@ -16,7 +16,7 @@ async function bundle(file, options) {
     ],
     experimentalCodeSplitting: true,
     onwarn(warn) {
-      if (warn.plugin === "rollup-plugin-cjs-es") {
+      if (warn.plugin === "rollup-plugin-cjs-es" || warn.code.startsWith("CJS_ES")) {
         warns.push(warn);
       }
     }
@@ -172,18 +172,12 @@ describe("unmatched import/export style", () => {
     `, async resolve => {
       let warns;
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
-      assert.equal(warns.length, 2);
+      assert.equal(warns.length, 1);
       
-      assert.equal(warns[0].pluginCode, "CJS_ES_UNMATCHED_IMPORT");
+      assert.equal(warns[0].code, "CJS_ES_MISSING_EXPORT");
       assert.equal(warns[0].importer, resolve("bar.js"));
       assert.equal(warns[0].importerExpect, "default");
-      assert.equal(warns[0].otherImporter, resolve("entry.js"));
-      assert.equal(warns[0].importee, resolve("foo.js"));
-
-      assert.equal(warns[1].pluginCode, "CJS_ES_MISSING_EXPORT");
-      assert.equal(warns[1].importer, resolve("bar.js"));
-      assert.equal(warns[1].importerExpect, "default");
-      assert.equal(warns[1].exporter, resolve("foo.js"));
+      assert.equal(warns[0].exporter, resolve("foo.js"));
       
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
@@ -222,21 +216,15 @@ describe("unmatched import/export style", () => {
       const exportType = (id) => id.endsWith("foo.js") ? "default" : null;
       let warns;
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
-      assert.equal(warns.length, 2);
+      assert.equal(warns.length, 1);
       
-      assert.equal(warns[0].pluginCode, "CJS_ES_UNMATCHED_IMPORT");
+      assert.equal(warns[0].code, "CJS_ES_MISSING_EXPORT");
       assert.equal(warns[0].importer, resolve("bar.js"));
       assert.equal(warns[0].importerExpect, "names");
-      assert.equal(warns[0].otherImporter, resolve("entry.js"));
-      assert.equal(warns[0].importee, resolve("foo.js"));
-      
-      assert.equal(warns[1].pluginCode, "CJS_ES_MISSING_EXPORT");
-      assert.equal(warns[1].importer, resolve("bar.js"));
-      assert.equal(warns[1].importerExpect, "names");
-      assert.equal(warns[1].exporter, resolve("foo.js"));
+      assert.equal(warns[0].exporter, resolve("foo.js"));
       
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
-      assert.equal(warns.length, 2);
+      assert.equal(warns.length, 1);
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
     })
@@ -279,7 +267,7 @@ describe("export table", () => {
     })
   );
   
-  it("unexpected warning", () =>
+  it("no warning if exporter exports both", () =>
     withDir(`
       - entry.js: |
           require("./foo");
@@ -295,7 +283,7 @@ describe("export table", () => {
     })
   );
   
-  it("unexpected warning 2", () =>
+  it("no warning if exporter exports both (unmatched import)", () =>
     withDir(`
       - entry.js: |
           require("./bar");
@@ -310,6 +298,7 @@ describe("export table", () => {
           foo();
     `, async resolve => {
       const {warns} = await bundle(resolve("entry.js"));
+      // console.log(warns)
       assert.equal(warns.length, 0);
     })
   );

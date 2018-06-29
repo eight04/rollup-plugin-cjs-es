@@ -150,12 +150,6 @@ function factory({
     exportTable[id].named = exportInfo.named.length > 0 || exportInfo.all;
     exportTable[id].trusted = !guessExportType.has(id);
     
-    if (exportTable[id].expects) {
-      for (const expect of exportTable[id].expects) {
-        checkExpect(expect, exportTable[id]);
-      }
-    }
-    
     return Promise.all(Object.entries(info.import).map(([name, importInfo]) => {
       const expect = {
         id,
@@ -180,54 +174,9 @@ function factory({
           }
           expect.trusted = !guessExportType.has(importee);
           expect.external = external;
-          if (exportTable[importee].loaded) {
-            checkExpect(expect, exportTable[importee]);
-          }
-          for (const otherExpect of exportTable[importee].expects) {
-            if (expect.default && !otherExpect.default) {
-              warnUnmatchedImport(expect.id, otherExpect.id, "default", importee);
-            }
-            if (expect.named && !otherExpect.named) {
-              warnUnmatchedImport(expect.id, otherExpect.id, "names", importee);
-            }
-          }
           exportTable[importee].expects.push(expect);
         });
     }));
-    
-    function checkExpect(expect, exportInfo) {
-      if (expect.default && !exportInfo.default) {
-        warnMissingExport(expect.id, "default", exportInfo.id);
-      }
-      if (expect.named && !exportInfo.named) {
-        warnMissingExport(expect.id, "names", exportInfo.id);
-      }
-    }
-    
-    function warnUnmatchedImport(importer, otherImporter, type, importee) {
-      context.warn({
-        code: "CJS_ES_UNMATCHED_IMPORT",
-        message: `'${r(importer)}' expects '${r(importee)}' to export ${type} but ${r(otherImporter)} doesn't`,
-        importer,
-        importerExpect: type,
-        otherImporter,
-        importee
-      });
-    }
-    
-    function warnMissingExport(importer, type, exporter) {
-      context.warn({
-        code: "CJS_ES_MISSING_EXPORT",
-        message: `'${r(exporter)}' doesn't export ${type} expected by '${r(importer)}'`,
-        importer,
-        importerExpect: type,
-        exporter
-      });
-    }
-    
-    function r(id) {
-      return path.relative(".", id);
-    }
   }
   
 	function transform(code, id) {
@@ -272,8 +221,45 @@ function factory({
   }
   
   function buildEnd() {
+    // warn missing exports
+    for (const exportInfo of Object.values(exportTable)) {
+      if (!exportInfo.expects) {
+        continue;
+      }
+      for (const expect of exportInfo.expects) {
+        const warning = checkExpect(expect, exportInfo);
+        // console.log(warning)
+        if (warning) {
+          this.warn(warning);
+        }
+      }
+    }
+    
     if (cache) {
       writeCjsEsCache();
+    }
+  }
+  
+  function checkExpect(expect, exportInfo) {
+    if (expect.default && !exportInfo.default) {
+      return missingExportWarning(expect.id, "default", exportInfo.id);
+    }
+    if (expect.named && !exportInfo.named) {
+      return missingExportWarning(expect.id, "names", exportInfo.id);
+    }
+  }
+
+  function missingExportWarning(importer, type, exporter) {
+    return {
+      code: "CJS_ES_MISSING_EXPORT",
+      message: `'${r(exporter)}' doesn't export ${type} expected by '${r(importer)}'`,
+      importer,
+      importerExpect: type,
+      exporter
+    };
+    
+    function r(id) {
+      return path.relative(".", id);
     }
   }
 }
