@@ -15,7 +15,7 @@ function isEsModule(result) {
 function factory({
   include = null,
   exclude = null,
-  cache = true,
+  cache = ".cjsescache",
   sourceMap = true,
   nested = false,
   exportType = null,
@@ -48,7 +48,7 @@ function factory({
   function loadCjsEsCache() {
     let data;
     try {
-      data = _fs.readFileSync(".cjsescache", "utf8");
+      data = _fs.readFileSync(cache, "utf8");
     } catch (err) {
       return;
     }
@@ -72,7 +72,7 @@ function factory({
         output[id] = expectBy;
         return output;
       }, {});
-    _fs.writeFileSync(".cjsescache", JSON.stringify(data, null, 2), "utf8");
+    _fs.writeFileSync(cache, JSON.stringify(data, null, 2), "utf8");
   }
   
   function getExportTypeFromOptions(id) {
