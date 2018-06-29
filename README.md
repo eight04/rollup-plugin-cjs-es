@@ -324,7 +324,7 @@ cjsEsFactory(options?:Object) => rollupPlugin
 
 * `include`: `Array<string>`. A list of minimatch pattern. Only matched files would be transformed. Match all files by default.
 * `exclude`: `Array<string>`. A list of minimatch pattern. Override `options.include`. Default: `[]`.
-* `cache`: `Boolean`. If true then read/write the cache file. Default: `true`.
+* `cache`: `String`. Path to the cache file. `false` to disable the cache. Default: `".cjsescache"`.
 * `sourceMap`: `boolean`. If true then generate the source map. Default: `true`.
 * `nested`: `boolean`. If true then analyze the AST recursively, otherwise only top-level nodes are analyzed. Default: `false`.
 * `exportType`: `null|string|object|function`. Tell the plugin how to determine the export type. Valid export types are `"named"`, `"default"`.
@@ -343,6 +343,13 @@ cjsEsFactory(options?:Object) => rollupPlugin
 
 Changelog
 ---------
+
+* 0.5.0 (Jun 29, 2018)
+
+  - Add: `options.cache` is a file path now.
+  - Change: the format of the cache file is changed. The cache file only records modules that export default.
+  - Fix: correctly record external modules in the cache.
+  - **Drop: code splitting with `require()` had been split out as [a new plugin](https://github.com/eight04/rollup-plugin-require-split-code).**
 
 * 0.4.0 (Jun 16, 2018)
 
