@@ -161,15 +161,30 @@ describe("unmatched import/export style", () => {
   it("import default if others import default", () =>
     withDir(`
       - entry.js: |
-          const foo = require("external");
-          require("./foo");
+          const foo = require("./foo");
+          require("./bar");
       - foo.js: |
-          import foo from "external";
+          module.exports = {
+            foo: "foo"
+          };
+      - bar.js: |
+          import foo from "./foo";
     `, async resolve => {
       let warns;
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
-      assert.equal(warns.length, 1);
-      assert(/entry\.js' thinks .*?external' export names but .*?foo\.js' disagree/.test(warns[0].message));
+      assert.equal(warns.length, 2);
+      
+      assert.equal(warns[0].pluginCode, "CJS_ES_UNMATCHED_IMPORT");
+      assert.equal(warns[0].importer, resolve("bar.js"));
+      assert.equal(warns[0].importerExpect, "default");
+      assert.equal(warns[0].otherImporter, resolve("entry.js"));
+      assert.equal(warns[0].importee, resolve("foo.js"));
+
+      assert.equal(warns[1].pluginCode, "CJS_ES_MISSING_EXPORT");
+      assert.equal(warns[1].importer, resolve("bar.js"));
+      assert.equal(warns[1].importerExpect, "default");
+      assert.equal(warns[1].exporter, resolve("foo.js"));
+      
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
     })
@@ -197,18 +212,31 @@ describe("unmatched import/export style", () => {
   it("import default but others import names (bad config)", () =>
     withDir(`
       - entry.js: |
-          const foo = require("external");
-          require("./foo.js");
+          const foo = require("./foo");
+          require("./bar");
       - foo.js: |
-          import {foo} from "external";
+          module.exports = {foo: "foo"};
+      - bar.js: |
+          import {foo} from "./foo";
     `, async resolve => {
-      const exportType = (id) => id === "external" ? "default" : null;
+      const exportType = (id) => id.endsWith("foo.js") ? "default" : null;
       let warns;
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
-      assert.equal(warns.length, 1);
-      assert(/entry\.js' thinks .*?external' export default but .*?foo\.js' disagree/.test(warns[0].message));
+      assert.equal(warns.length, 2);
+      
+      assert.equal(warns[0].pluginCode, "CJS_ES_UNMATCHED_IMPORT");
+      assert.equal(warns[0].importer, resolve("bar.js"));
+      assert.equal(warns[0].importerExpect, "names");
+      assert.equal(warns[0].otherImporter, resolve("entry.js"));
+      assert.equal(warns[0].importee, resolve("foo.js"));
+      
+      assert.equal(warns[1].pluginCode, "CJS_ES_MISSING_EXPORT");
+      assert.equal(warns[1].importer, resolve("bar.js"));
+      assert.equal(warns[1].importerExpect, "names");
+      assert.equal(warns[1].exporter, resolve("foo.js"));
+      
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
-      assert.equal(warns.length, 1);
+      assert.equal(warns.length, 2);
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
     })

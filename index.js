@@ -79,8 +79,8 @@ function factory({
         }
       })
       .filter(Boolean)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .reduce((output, [{id, expectBy}]) => {
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .reduce((output, {id, expectBy}) => {
         if (expectBy) {
           expectBy = path.relative(".", expectBy).replace(/\\/g, "/");
         }
@@ -124,6 +124,12 @@ function factory({
         if (exportTable[id] && exportTable[id].loaded) {
           return exportTable[id].named ? "named" : "default";
         }
+        if (exportTable[id] && exportTable[id].expects) {
+          const trustedExpect = exportTable[id].expects.find(e => e.trusted);
+          if (trustedExpect) {
+            return trustedExpect.named ? "named" : "default";
+          }
+        }
         // check if id is in preferDefault cache
         if (exportCache.hasOwnProperty(id) && exportCache[id] !== importer) {
           return "default";
@@ -138,6 +144,7 @@ function factory({
     if (!exportTable[id]) {
       exportTable[id] = {id};
     }
+    const exportInfo = info.export;
     exportTable[id].loaded = true;
     exportTable[id].default = exportInfo.default;
     exportTable[id].named = exportInfo.named.length > 0 || exportInfo.all;
@@ -192,7 +199,7 @@ function factory({
       if (expect.default && !exportInfo.default) {
         warnMissingExport(expect.id, "default", exportInfo.id);
       }
-      if (expect.named && && !exportInfo.named) {
+      if (expect.named && !exportInfo.named) {
         warnMissingExport(expect.id, "names", exportInfo.id);
       }
     }
@@ -211,7 +218,7 @@ function factory({
     function warnMissingExport(importer, type, exporter) {
       context.warn({
         code: "CJS_ES_MISSING_EXPORT",
-        message: `'${r(exporter)}' doesn't export ${type} expected by '${r(importer)}'`
+        message: `'${r(exporter)}' doesn't export ${type} expected by '${r(importer)}'`,
         importer,
         importerExpect: type,
         exporter
