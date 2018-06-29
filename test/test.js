@@ -297,9 +297,25 @@ describe("export table", () => {
           const foo = require("./foo");
           foo();
     `, async resolve => {
-      const {warns} = await bundle(resolve("entry.js"));
-      // console.log(warns)
-      assert.equal(warns.length, 0);
+      {
+        const {warns, modules} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
+        assert.equal(warns.length, 0);
+        
+        const bar = modules.find(m => m.id.endsWith("bar.js"));
+        assert.equal(bar.code.trim(), endent`
+          import {foo} from "./foo";
+        `);
+      }
+      // another run with cache, make sure bar.js is not affected by the cache.
+      {
+        const {warns, modules} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
+        assert.equal(warns.length, 0);
+        
+        const bar = modules.find(m => m.id.endsWith("bar.js"));
+        assert.equal(bar.code.trim(), endent`
+          import {foo} from "./foo";
+        `);
+      }
     })
   );
 });
