@@ -12,7 +12,7 @@ async function bundle(file, options) {
   const bundle = await rollup.rollup({
     input: [file],
     plugins: [
-      cjsEs(Object.assign({cache: false}, options))
+      cjsEs(Object.assign({cache: false, nested: true}, options))
     ],
     experimentalCodeSplitting: true,
     onwarn(warn) {
@@ -32,6 +32,21 @@ async function bundle(file, options) {
   result.modules = modules;
   return result;
 }
+
+describe("main", () => {
+  it("warn unconverted require", () =>
+    withDir(`
+      - entry.js: |
+          const r = require;
+          r("foo");
+    `, async resolve => {
+      const {warns} = await bundle(resolve("entry.js"));
+      assert.equal(warns.length, 1);
+      assert(/Unconverted `require`/.test(warns[0].message));
+      assert.equal(warns[0].pos, 10);
+    })
+  );
+});
 
 describe("exportType option", () => {
   it("named", () =>
@@ -125,8 +140,9 @@ describe("exportType option", () => {
   );
 });
 
-describe("unmatched export type", () => {
-  it("import default if dep exports default", () =>
+describe("unmatched import/export style", () => {
+  // warn users if the import style doesn't match the actual exports
+  it("import default if importee exports default", () =>
     withDir(`
       - entry.js: |
           const foo = require("./foo");
@@ -150,12 +166,12 @@ describe("unmatched export type", () => {
       - foo.js: |
           import foo from "external";
     `, async resolve => {
-      const {warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
+      let warns;
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 1);
       assert(/entry\.js' thinks .*?external' export names but .*?foo\.js' disagree/.test(warns[0].message));
-      
-      const {warns: warns2} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
-      assert.equal(warns2.length, 0);
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
     })
   );
   
@@ -197,7 +213,10 @@ describe("unmatched export type", () => {
       assert.equal(warns.length, 0);
     })
   );
-  
+});
+
+describe("export table", () => {
+  // use export table to decide export style
   it("export default if others import default", () =>
     withDir(`
       - entry.js: |
@@ -205,12 +224,29 @@ describe("unmatched export type", () => {
       - foo.js: |
           exports.foo = "foo";
     `, async resolve => {
-      const {warns, modules} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
+      const {warns, modules} = await bundle(resolve("entry.js"));
       assert.equal(warns.length, 0);
       assert.equal(modules[1].code.trim(), endent`
         let _exports_ = {};
         _exports_.foo = "foo";
         export default _exports_;
+      `);
+    })
+  );
+  
+  it("export names if other exports names", () =>
+    // FIXME: since cjs-es export names by default, should we drop this test?
+    withDir(`
+      - entry.js: |
+          import {foo} from "./foo";
+      - foo.js: |
+          exports.foo = "foo";
+    `, async resolve => {
+      const {warns, modules} = await bundle(resolve("entry.js"));
+      assert.equal(warns.length, 0);
+      assert.equal(modules[1].code.trim(), endent`
+        const _export_foo_ = "foo";
+        export {_export_foo_ as foo};
       `);
     })
   );
