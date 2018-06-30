@@ -140,7 +140,7 @@ describe("exportType option", () => {
   );
 });
 
-describe("unmatched import/export style", () => {
+describe("unmatched import/export style and cache", () => {
   // warn users if the import style doesn't match the actual exports
   it("import default if importee exports default", () =>
     withDir(`
@@ -229,43 +229,6 @@ describe("unmatched import/export style", () => {
       assert.equal(warns.length, 0);
     })
   );
-});
-
-describe("export table", () => {
-  // use export table to decide export style
-  it("export default if others import default", () =>
-    withDir(`
-      - entry.js: |
-          import foo from "./foo";
-      - foo.js: |
-          exports.foo = "foo";
-    `, async resolve => {
-      const {warns, modules} = await bundle(resolve("entry.js"));
-      assert.equal(warns.length, 0);
-      assert.equal(modules[1].code.trim(), endent`
-        let _exports_ = {};
-        _exports_.foo = "foo";
-        export default _exports_;
-      `);
-    })
-  );
-  
-  it("export names if other exports names", () =>
-    // FIXME: since cjs-es export names by default, should we drop this test?
-    withDir(`
-      - entry.js: |
-          import {foo} from "./foo";
-      - foo.js: |
-          exports.foo = "foo";
-    `, async resolve => {
-      const {warns, modules} = await bundle(resolve("entry.js"));
-      assert.equal(warns.length, 0);
-      assert.equal(modules[1].code.trim(), endent`
-        const _export_foo_ = "foo";
-        export {_export_foo_ as foo};
-      `);
-    })
-  );
   
   it("no warning if exporter exports both", () =>
     withDir(`
@@ -278,8 +241,23 @@ describe("export table", () => {
       - bar.js: |
           const {foo} = require("./foo");
     `, async resolve => {
-      const {warns} = await bundle(resolve("entry.js"));
-      assert.equal(warns.length, 0);
+      {
+        const {warns, modules} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
+        assert.equal(warns.length, 0);
+        const bar = modules.find(m => m.id.endsWith("bar.js"));
+        assert.equal(bar.code.trim(), endent`
+          import {foo} from "./foo";
+        `);
+      }
+      // another run with cache
+      {
+        const {warns, modules} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
+        assert.equal(warns.length, 0);
+        const bar = modules.find(m => m.id.endsWith("bar.js"));
+        assert.equal(bar.code.trim(), endent`
+          import {foo} from "./foo";
+        `);
+      }
     })
   );
   
@@ -316,6 +294,43 @@ describe("export table", () => {
           import {foo} from "./foo";
         `);
       }
+    })
+  );
+});
+
+describe("export table", () => {
+  // use export table to decide export style
+  it("export default if others import default", () =>
+    withDir(`
+      - entry.js: |
+          import foo from "./foo";
+      - foo.js: |
+          exports.foo = "foo";
+    `, async resolve => {
+      const {warns, modules} = await bundle(resolve("entry.js"));
+      assert.equal(warns.length, 0);
+      assert.equal(modules[1].code.trim(), endent`
+        let _exports_ = {};
+        _exports_.foo = "foo";
+        export default _exports_;
+      `);
+    })
+  );
+  
+  it("export names if other import names", () =>
+    // FIXME: since cjs-es export names by default, should we drop this test?
+    withDir(`
+      - entry.js: |
+          import {foo} from "./foo";
+      - foo.js: |
+          exports.foo = "foo";
+    `, async resolve => {
+      const {warns, modules} = await bundle(resolve("entry.js"));
+      assert.equal(warns.length, 0);
+      assert.equal(modules[1].code.trim(), endent`
+        const _export_foo_ = "foo";
+        export {_export_foo_ as foo};
+      `);
     })
   );
 });

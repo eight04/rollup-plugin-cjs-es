@@ -62,14 +62,18 @@ function factory({
   function writeCjsEsCache() {
     const data = Object.entries(exportTable)
       .map(([id, info]) => {
-        if (info.loaded && info.default && info.trusted) {
-          return {
-            id,
-            expectBy: null
-          };
+        if (info.loaded && info.trusted) {
+          if (info.default && !info.named) {
+            return {
+              id,
+              expectBy: null
+            };
+          }
+          return;
         }
         if (info.expects) {
           const trustedExpect = info.expects.find(e => e.trusted);
+          // FIXME: is it possible that someone imports named/default at the same time?
           if (trustedExpect && trustedExpect.default) {
             return {
               id,
