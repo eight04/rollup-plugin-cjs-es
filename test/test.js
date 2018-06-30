@@ -1,5 +1,7 @@
 /* eslint-env mocha */
 const assert = require("assert");
+const fs = require("fs");
+
 const rollup = require("rollup");
 const {withDir} = require("tempdir-yaml");
 const endent = require("endent");
@@ -294,6 +296,24 @@ describe("unmatched import/export style and cache", () => {
           import {foo} from "./foo";
         `);
       }
+    })
+  );
+  
+  it("the cache is ordered", () =>
+    withDir(`
+      - entry.js: |
+          require("./foo")
+          require("./bar")
+      - foo.js: |
+          module.exports = "foo";
+      - bar.js: |
+          module.exports = "bar";
+    `, async resolve => {
+      await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
+      const cache = JSON.parse(fs.readFileSync(resolve(".cjsescache"), "utf8"));
+      const keys = Object.keys(cache);
+      assert(keys[0].endsWith("bar.js"));
+      assert(keys[1].endsWith("foo.js"));
     })
   );
 });
