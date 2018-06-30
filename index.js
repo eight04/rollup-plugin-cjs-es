@@ -232,7 +232,6 @@ function factory({
       }
       for (const expect of exportInfo.expects) {
         const warning = checkExpect(expect, exportInfo);
-        // console.log(warning)
         if (warning) {
           this.warn(warning);
         }

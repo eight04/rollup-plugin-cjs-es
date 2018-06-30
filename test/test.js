@@ -18,6 +18,7 @@ async function bundle(file, options) {
     ],
     experimentalCodeSplitting: true,
     onwarn(warn) {
+      // https://github.com/rollup/rollup/issues/2308
       if (warn.plugin === "rollup-plugin-cjs-es" || warn.code.startsWith("CJS_ES")) {
         warns.push(warn);
       }
