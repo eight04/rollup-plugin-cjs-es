@@ -1,5 +1,7 @@
 /* eslint-env mocha */
 const assert = require("assert");
+const fs = require("fs");
+
 const rollup = require("rollup");
 const {withDir} = require("tempdir-yaml");
 const endent = require("endent");
@@ -16,7 +18,8 @@ async function bundle(file, options) {
     ],
     experimentalCodeSplitting: true,
     onwarn(warn) {
-      if (warn.plugin === "rollup-plugin-cjs-es") {
+      // https://github.com/rollup/rollup/issues/2308
+      if (warn.plugin === "rollup-plugin-cjs-es" || warn.code.startsWith("CJS_ES")) {
         warns.push(warn);
       }
     }
@@ -140,7 +143,7 @@ describe("exportType option", () => {
   );
 });
 
-describe("unmatched import/export style", () => {
+describe("unmatched import/export style and cache", () => {
   // warn users if the import style doesn't match the actual exports
   it("import default if importee exports default", () =>
     withDir(`
@@ -161,15 +164,24 @@ describe("unmatched import/export style", () => {
   it("import default if others import default", () =>
     withDir(`
       - entry.js: |
-          const foo = require("external");
-          require("./foo");
+          const foo = require("./foo");
+          require("./bar");
       - foo.js: |
-          import foo from "external";
+          module.exports = {
+            foo: "foo"
+          };
+      - bar.js: |
+          import foo from "./foo";
     `, async resolve => {
       let warns;
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 1);
-      assert(/entry\.js' thinks .*?external' export names but .*?foo\.js' disagree/.test(warns[0].message));
+      
+      assert.equal(warns[0].code, "CJS_ES_MISSING_EXPORT");
+      assert.equal(warns[0].importer, resolve("bar.js"));
+      assert.equal(warns[0].importerExpect, "default");
+      assert.equal(warns[0].exporter, resolve("foo.js"));
+      
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
     })
@@ -197,20 +209,112 @@ describe("unmatched import/export style", () => {
   it("import default but others import names (bad config)", () =>
     withDir(`
       - entry.js: |
-          const foo = require("external");
-          require("./foo.js");
+          const foo = require("./foo");
+          require("./bar");
       - foo.js: |
-          import {foo} from "external";
+          module.exports = {foo: "foo"};
+      - bar.js: |
+          import {foo} from "./foo";
     `, async resolve => {
-      const exportType = (id) => id === "external" ? "default" : null;
+      const exportType = (id) => id.endsWith("foo.js") ? "default" : null;
       let warns;
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
       assert.equal(warns.length, 1);
-      assert(/entry\.js' thinks .*?external' export default but .*?foo\.js' disagree/.test(warns[0].message));
+      
+      assert.equal(warns[0].code, "CJS_ES_MISSING_EXPORT");
+      assert.equal(warns[0].importer, resolve("bar.js"));
+      assert.equal(warns[0].importerExpect, "names");
+      assert.equal(warns[0].exporter, resolve("foo.js"));
+      
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
       assert.equal(warns.length, 1);
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
+    })
+  );
+  
+  it("no warning if exporter exports both", () =>
+    withDir(`
+      - entry.js: |
+          require("./foo");
+          require("./bar");
+      - foo.js: |
+          export function foo() {}
+          export default "foo";
+      - bar.js: |
+          const {foo} = require("./foo");
+    `, async resolve => {
+      {
+        const {warns, modules} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
+        assert.equal(warns.length, 0);
+        const bar = modules.find(m => m.id.endsWith("bar.js"));
+        assert.equal(bar.code.trim(), endent`
+          import {foo} from "./foo";
+        `);
+      }
+      // another run with cache
+      {
+        const {warns, modules} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
+        assert.equal(warns.length, 0);
+        const bar = modules.find(m => m.id.endsWith("bar.js"));
+        assert.equal(bar.code.trim(), endent`
+          import {foo} from "./foo";
+        `);
+      }
+    })
+  );
+  
+  it("no warning if exporter exports both (unmatched import)", () =>
+    withDir(`
+      - entry.js: |
+          require("./bar");
+          require("./baz");
+      - foo.js: |
+          export const foo = "foo";
+          export default () => {};
+      - bar.js: |
+          const {foo} = require("./foo");
+      - baz.js: |
+          const foo = require("./foo");
+          foo();
+    `, async resolve => {
+      {
+        const {warns, modules} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
+        assert.equal(warns.length, 0);
+        
+        const bar = modules.find(m => m.id.endsWith("bar.js"));
+        assert.equal(bar.code.trim(), endent`
+          import {foo} from "./foo";
+        `);
+      }
+      // another run with cache, make sure bar.js is not affected by the cache.
+      {
+        const {warns, modules} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
+        assert.equal(warns.length, 0);
+        
+        const bar = modules.find(m => m.id.endsWith("bar.js"));
+        assert.equal(bar.code.trim(), endent`
+          import {foo} from "./foo";
+        `);
+      }
+    })
+  );
+  
+  it("the cache is ordered", () =>
+    withDir(`
+      - entry.js: |
+          require("./foo")
+          require("./bar")
+      - foo.js: |
+          module.exports = "foo";
+      - bar.js: |
+          module.exports = "bar";
+    `, async resolve => {
+      await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
+      const cache = JSON.parse(fs.readFileSync(resolve(".cjsescache"), "utf8"));
+      const keys = Object.keys(cache);
+      assert(keys[0].endsWith("bar.js"));
+      assert(keys[1].endsWith("foo.js"));
     })
   );
 });
@@ -234,7 +338,7 @@ describe("export table", () => {
     })
   );
   
-  it("export names if other exports names", () =>
+  it("export names if other import names", () =>
     // FIXME: since cjs-es export names by default, should we drop this test?
     withDir(`
       - entry.js: |
