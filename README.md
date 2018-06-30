@@ -344,6 +344,10 @@ cjsEsFactory(options?:Object) => rollupPlugin
 Changelog
 ---------
 
+* 0.5.1 (Jun 30, 2018)
+
+  - Fix: unexpected warning when importee exports both names and default.
+
 * 0.5.0 (Jun 29, 2018)
 
   - Add: `options.cache` is a file path now.
