@@ -20,7 +20,7 @@ function factory({
   nested = false,
   exportType = null,
   _fs = fs
-}) {
+} = {}) {
   const exportTypeCache = {};
   const exportTable = {};
   const exportCache = {};
