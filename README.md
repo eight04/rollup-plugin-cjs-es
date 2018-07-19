@@ -344,6 +344,11 @@ cjsEsFactory(options?:Object) => rollupPlugin
 Changelog
 ---------
 
+* 0.6.0 (Jul 19, 2018)
+
+  - Fix: destructure error when initializing the plugin.
+  - Update dependencies. Nested named exports won't be hoisted anymore.
+
 * 0.5.1 (Jun 30, 2018)
 
   - Fix: unexpected warning when importee exports both names and default.
