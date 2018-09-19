@@ -324,10 +324,14 @@ cjsEsFactory(options?:Object) => rollupPlugin
 Changelog
 ---------
 
+* 0.7.0 (Sep 19, 2018)
+  - Enhance: don't emit export type unmatch warning when the module is not loaded.
+  - Update cjs-es to 0.6.1. Now `module.exports` and `exports` are bound to a single reference.
+
 * 0.6.0 (Jul 19, 2018)
 
-  - Fix: destructure error when initializing the plugin.
-  - Update dependencies. Nested named exports won't be hoisted anymore.
+  - Fix: destructuring error when initializing the plugin.
+  - Update dependencies. Nested named exports won't be merged into a single namespace anymore.
 
 * 0.5.1 (Jun 30, 2018)
 
