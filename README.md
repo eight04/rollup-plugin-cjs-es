@@ -17,10 +17,10 @@ npm install -D rollup-plugin-cjs-es
 Features
 --------
 
-* Transform typical cases.
+* Convert CommonJS modules into ES modules so they can be processed by Rollup.
 * Emit warnings for unconverted `require`s.
-* Use a cache file to solve export type conflicts instead of using proxy modules.
-* Split code with `Promise.resolve(require())`.
+* Use a cache file to solve export type conflicts instead of using proxy modules, so it works better with tree-shaking.
+* Transform dynamic imports: `Promise.resolve(require("..."))`.
 
 Usage
 -----
@@ -42,30 +42,10 @@ export default {
 };
 ```
 
-Compatibility
--------------
+`require` is reassigned
+-----------------------
 
-`cjs-es` can transform top-level `require`, `exports`, and `module.exports` statements into `import` and `export`. For those non-top-level statements, the transformer hoist them to top-level:
-
-```js
-const baz = require("foo").bar.baz;
-if (baz) {
-  const bak = require("bar");
-}
-```
-
-After hoisting:
-
-```js
-const _require_foo_ = require("foo");
-const baz = _require_foo_.bar.baz;
-const _require_bar_ = require("bar");
-if (baz) {
-  const bak = _require_bar_;
-}
-```
-
-However, if `require`, `exports`, or `module` are dynamically assigned, the transformer can't find them and it will emit a warning e.g.
+If `require`, `exports`, or `module` are dynamically assigned, the transformer can't find them and it will emit a warning e.g.
 
 ```js
 (function(r) {
@@ -121,7 +101,7 @@ exports.bar = bar;
 
 So that `bar.js` is not loaded until `require("foo").foo()` is called.
 
-With this plugin, you can use the same feature with CommonJS syntax, by writing the require statement inside a promise:
+With this plugin, you can use the same feature using CommonJS syntax, by writing the require statement inside a promise:
 
 ```js
 module.exports = {
@@ -131,7 +111,7 @@ module.exports = {
 };
 ```
 
-The plugin would transform it into the dynamic `import()`.
+The plugin would transform it into a dynamic `import()`.
 
 Named import/export v.s. default import/export
 ----------------------------------------------
