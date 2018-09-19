@@ -18,8 +18,7 @@ async function bundle(file, options) {
     ],
     experimentalCodeSplitting: true,
     onwarn(warn) {
-      // https://github.com/rollup/rollup/issues/2308
-      if (warn.plugin === "rollup-plugin-cjs-es" || warn.code.startsWith("CJS_ES")) {
+      if (warn.code === "PLUGIN_WARNING") {
         warns.push(warn);
       }
     }
@@ -177,7 +176,7 @@ describe("unmatched import/export style and cache", () => {
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 1);
       
-      assert.equal(warns[0].code, "CJS_ES_MISSING_EXPORT");
+      assert.equal(warns[0].pluginCode, "CJS_ES_MISSING_EXPORT");
       assert.equal(warns[0].importer, resolve("bar.js"));
       assert.equal(warns[0].importerExpect, "default");
       assert.equal(warns[0].exporter, resolve("foo.js"));
@@ -221,7 +220,7 @@ describe("unmatched import/export style and cache", () => {
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
       assert.equal(warns.length, 1);
       
-      assert.equal(warns[0].code, "CJS_ES_MISSING_EXPORT");
+      assert.equal(warns[0].pluginCode, "CJS_ES_MISSING_EXPORT");
       assert.equal(warns[0].importer, resolve("bar.js"));
       assert.equal(warns[0].importerExpect, "names");
       assert.equal(warns[0].exporter, resolve("foo.js"));
