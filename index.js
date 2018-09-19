@@ -230,6 +230,16 @@ function factory({
       if (!exportInfo.expects) {
         continue;
       }
+      if (!exportInfo.loaded) {
+        if (!this.isExternal(exportInfo.id)) {
+          this.warn({
+            code: "CJS_ES_NOT_LOADED",
+            moduleId: exportInfo.id,
+            message: `${r(exportInfo.id)} is not loaded.`
+          });
+        }
+        continue;
+      }
       for (const expect of exportInfo.expects) {
         const warning = checkExpect(expect, exportInfo);
         if (warning) {
@@ -260,10 +270,10 @@ function factory({
       importerExpect: type,
       exporter
     };
-    
-    function r(id) {
-      return path.relative(".", id);
-    }
+  }
+
+  function r(id) {
+    return path.relative(".", id);
   }
 }
 

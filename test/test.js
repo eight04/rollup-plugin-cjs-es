@@ -9,7 +9,7 @@ const sinon = require("sinon");
 
 const cjsEs = require("..");
 
-async function bundle(file, options) {
+async function bundle(file, options, rollupOptions = {}) {
   const warns = [];
   const bundle = await rollup.rollup({
     input: [file],
@@ -21,7 +21,8 @@ async function bundle(file, options) {
       if (warn.code === "PLUGIN_WARNING") {
         warns.push(warn);
       }
-    }
+    },
+    ...rollupOptions
   });
   const modules = bundle.cache.modules.slice();
   const result = await bundle.generate({
@@ -296,6 +297,36 @@ describe("unmatched import/export style and cache", () => {
           import {foo} from "./foo";
         `);
       }
+    })
+  );
+  
+  it("warn not-loaded modules", () =>
+    withDir(`
+      - entry.js: |
+          const foo = require("foo");
+          require("./bar");
+      - bar.js: |
+          const foo = require("foo");
+          foo();
+    `, async resolve => {
+      const {warns} = await bundle(resolve("entry.js"));
+      assert.equal(warns.length, 1);
+      assert.equal(warns[0].pluginCode, "CJS_ES_NOT_LOADED");
+      assert.equal(warns[0].moduleId, "foo");
+    })
+  );
+  
+  it("ignore externals", () =>
+    withDir(`
+      - entry.js: |
+          const foo = require("foo");
+          require("./bar");
+      - bar.js: |
+          const foo = require("foo");
+          foo();
+    `, async resolve => {
+      const {warns} = await bundle(resolve("entry.js"), {}, {external: ["foo"]});
+      assert.equal(warns.length, 0);
     })
   );
   
