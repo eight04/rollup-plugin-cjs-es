@@ -324,7 +324,12 @@ cjsEsFactory(options?:Object) => rollupPlugin
 Changelog
 ---------
 
+* 0.8.0 (Jun 5, 2019)
+
+  - Bump dependencies. Update to rollup@1.13.1.
+
 * 0.7.0 (Sep 19, 2018)
+
   - Enhance: don't emit export type unmatch warning when the module is not loaded.
   - Update cjs-es to 0.6.1. Now `module.exports` and `exports` are bound to a single reference.
 
