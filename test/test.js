@@ -33,6 +33,20 @@ async function bundle(file, options, rollupOptions = {}) {
   });
   result.warns = warns;
   result.modules = modules;
+  result.namedOutput = result.output.reduce(
+    (o, output) => {
+      o[output.fileName] = output;
+      return o;
+    },
+    {}
+  );
+  result.namedModules = result.modules.reduce(
+    (o, m) => {
+      o[m.id.match(/[^\\/]+$/)[0]] = m;
+      return o;
+    },
+    {}
+  );
   return result;
 }
 
@@ -58,8 +72,8 @@ describe("exportType option", () => {
           const foo = require("foo");
           module.exports = {foo};
     `, async resolve => {
-      const {output} = await bundle(resolve("entry.js"));
-      const {output: output2} = await bundle(resolve("entry.js"), {exportType: "named"});
+      const {namedOutput: output} = await bundle(resolve("entry.js"));
+      const {namedOutput: output2} = await bundle(resolve("entry.js"), {exportType: "named"});
       assert.equal(output["entry.js"].code, output2["entry.js"].code);
       assert.equal(output["entry.js"].code.trim(), endent`
         import * as foo from 'foo';
@@ -74,7 +88,7 @@ describe("exportType option", () => {
           const foo = require("foo");
           module.exports = {foo};
     `, async resolve => {
-      const {output} = await bundle(resolve("entry.js"), {exportType: "default"});
+      const {namedOutput: output} = await bundle(resolve("entry.js"), {exportType: "default"});
       assert.equal(output["entry.js"].code.trim(), endent`
         import foo from 'foo';
         
@@ -101,7 +115,7 @@ describe("exportType option", () => {
         }
         return "default";
       });
-      const {output} = await bundle(resolve("entry.js"), {exportType});
+      const {namedOutput: output} = await bundle(resolve("entry.js"), {exportType});
       assert.equal(exportType.callCount, 2);
       assert.equal(output["entry.js"].code.trim(), endent`
         var foo = {
@@ -127,7 +141,7 @@ describe("exportType option", () => {
         [resolve("entry.js")]: "default",
         [resolve("foo.js")]: "named"
       };
-      const {output} = await bundle(resolve("entry.js"), {exportType});
+      const {namedOutput: output} = await bundle(resolve("entry.js"), {exportType});
       assert.equal(output["entry.js"].code.trim(), endent`
         const _export_foo_ = "FOO";
         
@@ -358,13 +372,9 @@ describe("export table", () => {
       - foo.js: |
           exports.foo = "foo";
     `, async resolve => {
-      const {warns, modules} = await bundle(resolve("entry.js"));
+      const {warns, namedModules} = await bundle(resolve("entry.js"));
       assert.equal(warns.length, 0);
-      assert.equal(modules[1].code.trim(), endent`
-        let _exports_ = {};
-        _exports_.foo = "foo";
-        export default _exports_;
-      `);
+      assert(/export .+ as default/.test(namedModules["foo.js"].code));
     })
   );
   
@@ -376,12 +386,9 @@ describe("export table", () => {
       - foo.js: |
           exports.foo = "foo";
     `, async resolve => {
-      const {warns, modules} = await bundle(resolve("entry.js"));
+      const {warns, namedModules} = await bundle(resolve("entry.js"));
       assert.equal(warns.length, 0);
-      assert.equal(modules[1].code.trim(), endent`
-        const _export_foo_ = "foo";
-        export {_export_foo_ as foo};
-      `);
+      assert(/export .+ as foo/.test(namedModules["foo.js"].code));
     })
   );
 });
