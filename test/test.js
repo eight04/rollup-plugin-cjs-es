@@ -11,15 +11,17 @@ const cjsEs = require("..");
 
 async function bundle(file, options, rollupOptions = {}) {
   const warns = [];
+  const systemWarns = [];
   const bundle = await rollup.rollup({
     input: [file],
     plugins: [
       cjsEs(Object.assign({cache: false, nested: true}, options))
     ],
-    experimentalCodeSplitting: true,
     onwarn(warn) {
       if (warn.code === "PLUGIN_WARNING") {
         warns.push(warn);
+      } else {
+        systemWarns.push(warn);
       }
     },
     ...rollupOptions
@@ -32,6 +34,7 @@ async function bundle(file, options, rollupOptions = {}) {
     sourcemap: true
   });
   result.warns = warns;
+  result.systemWarns = systemWarns;
   result.modules = modules;
   result.namedOutput = result.output.reduce(
     (o, output) => {
@@ -198,6 +201,33 @@ describe("unmatched import/export style and cache", () => {
       
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
+    })
+  );
+  
+  it("import default if the name is missing and the name is an object method", () =>
+    withDir(`
+      - entry.js: |
+          const foo = require("./foo");
+          console.log(foo.hasOwnProperty("foo"));
+      - foo.js: |
+          module.exports = {
+            foo: "foo"
+          };
+    `, async resolve => {
+      let systemWarns;
+      ({systemWarns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(systemWarns.length, 1);
+      
+      assert.equal(systemWarns[0].code, "MISSING_EXPORT");
+      assert.equal(systemWarns[0].importer, resolve("entry.js"));
+      assert.equal(systemWarns[0].missing, "hasOwnProperty");
+      assert.equal(systemWarns[0].exporter, resolve("foo.js"));
+      
+      ({systemWarns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(systemWarns.length, 0);
+      
+      ({systemWarns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(systemWarns.length, 0);
     })
   );
   
