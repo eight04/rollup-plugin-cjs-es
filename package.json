@@ -27,16 +27,16 @@
     "eslint": "^5.16.0",
     "mocha": "^6.1.4",
     "nyc": "^14.1.1",
-    "rollup": "^1.13.1",
+    "rollup": "^1.14.3",
     "sinon": "^7.3.2",
-    "tempdir-yaml": "^0.2.1"
+    "tempdir-yaml": "^0.3.0"
   },
   "dependencies": {
-    "cjs-es": "^0.6.2",
-    "es-info": "^0.1.1",
+    "cjs-es": "^0.6.4",
+    "es-info": "^0.2.0",
     "rollup-pluginutils": "^2.8.1"
   },
   "peerDependencies": {
-    "rollup": "^1.13.1"
+    "rollup": "^1.14.3"
   }
 }
