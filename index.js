@@ -96,11 +96,14 @@ function factory({
             };
           }
           const names = findMissingNames(info);
-          const expectObjectMethod = names.find(n => n.name in Object.prototype);
-          if (expectObjectMethod) {
+          // if the missing name is a builtin method, we should import an object
+          const result = names.find(n => n.name in Object.prototype);
+          if (result) {
             return {
               id,
-              expectBy: expectObjectMethod.expectBy
+              // expectBy: result.expectBy
+              // FIXME: we have to decide the export type at runtime. We need to save the actual exported names in the cache file.
+              expectBy: null
             };
           }
         }
