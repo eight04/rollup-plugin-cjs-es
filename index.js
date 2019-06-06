@@ -59,6 +59,21 @@ function factory({
     }
   }
   
+  function findMissingNames({info: exportInfo, expects}) {
+    const exportedNames = new Set(exportInfo.named);
+    const names = [];
+    if (expects) {
+      for (const expect of expects) {
+        for (const name of expect.info.used) {
+          if (!exportedNames.has(name)) {
+            names.push({name, expectBy: expect.id});
+          }
+        }
+      }
+    }
+    return names;
+  }
+  
   function writeCjsEsCache() {
     const data = Object.entries(exportTable)
       .map(([id, info]) => {
@@ -78,6 +93,14 @@ function factory({
             return {
               id,
               expectBy: trustedExpect.id
+            };
+          }
+          const names = findMissingNames(info);
+          const expectObjectMethod = names.find(n => n.name in Object.prototype);
+          if (expectObjectMethod) {
+            return {
+              id,
+              expectBy: expectObjectMethod.expectBy
             };
           }
         }
@@ -153,12 +176,14 @@ function factory({
     exportTable[id].default = exportInfo.default;
     exportTable[id].named = exportInfo.named.length > 0 || exportInfo.all;
     exportTable[id].trusted = !guessExportType.has(id);
+    exportTable[id].info = info;
     
     return Promise.all(Object.entries(info.import).map(([name, importInfo]) => {
       const expect = {
         id,
         default: importInfo.default,
-        named: importInfo.named.length || importInfo.all
+        named: importInfo.named.length || importInfo.all,
+        info: importInfo
       };
       if (!expect.default && !expect.named) {
         return;
