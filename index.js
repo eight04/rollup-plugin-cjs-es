@@ -332,8 +332,9 @@ function factory({
   }
 
   function r(id) {
+    console.log(id);
     const relPath = path.relative(".", id);
-    if (/^..[\\/]/.test(relPath)) {
+    if (/^\.\.[\\/]/.test(relPath)) {
       return id;
     }
     return relPath;
