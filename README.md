@@ -329,6 +329,7 @@ Changelog
   - **Breaking: cache format is chanaged. You may have to delete the old one.**
   - **Breaking: bump node version to use async/await.**
   - Add: analyze missing exports and fallback to default object.
+  - Fix: don't warn unmatched export type if nothing is imported.
 
 * 0.8.0 (Jun 5, 2019)
 
