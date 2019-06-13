@@ -332,7 +332,11 @@ function factory({
   }
 
   function r(id) {
-    return path.relative(".", id);
+    const relPath = path.relative(".", id);
+    if (/^..[\\/]/.test(relPath)) {
+      return id;
+    }
+    return relPath;
   }
 }
 
