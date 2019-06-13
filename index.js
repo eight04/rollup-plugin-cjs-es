@@ -21,7 +21,7 @@ function factory({
   exportType = null,
   _fs = fs
 } = {}) {
-  const cjsEsCache = new Map;
+  const cjsEsCache = new Set;
   const exportTypeCache = {};
   const exportTable = {};
   const filter = createFilter(include, exclude);
@@ -57,60 +57,45 @@ function factory({
       return;
     }
     data = JSON.parse(data);
-    for (const [id, expectBy] of Object.entries(data)) {
+    for (const id of data) {
       const absId = id[0] === "~" ? id.slice(1) : path.resolve(id);
-      cjsEsCache.set(absId, {expectBy});
+      cjsEsCache.add(absId);
     }
   }
   
   function writeCjsEsCache() {
     const data = Object.entries(exportTable)
-      .map(([id, info]) => {
+      .filter(([, info]) => {
         // is ES module
         if (info.trusted) {
           if (info.default && !info.named.length) {
-            return {
-              id,
-              expectBy: null
-            };
+            return true;
           }
-          return;
+          return false;
         }
         if (info.expects) {
           const trustedExpect = info.expects.find(e => e.trusted);
           // FIXME: is it possible that someone imports named/default at the same time?
           if (trustedExpect && trustedExpect.default) {
-            return {
-              id,
-              expectBy: trustedExpect.id
-            };
+            return true;
           }
           // importer and exporter are both untrustable (cjs module)
           // find missing names
           if (info.loaded) {
-            const expect = info.expects.find(e =>
-              e.all && info.default ||
+            const expect = info.expects.find(e => 
               e.importedProps && e.importedProps.some(n => !info.exportedProps.includes(n))
             );
             if (expect) {
-              return {
-                id,
-                expectBy: expect.id
-              };
+              return true;
             }
           }
         }
+        return false;
       })
-      .filter(Boolean)
-      .sort((a, b) => a.id.localeCompare(b.id))
-      .reduce((output, {id, expectBy}) => {
-        if (expectBy) {
-          expectBy = path.relative(".", expectBy).replace(/\\/g, "/");
-        }
-        id = path.isAbsolute(id) ? path.relative(".", id).replace(/\\/g, "/") : `~${id}`;
-        output[id] = expectBy;
-        return output;
-      }, {});
+      .map(([id]) =>
+        path.isAbsolute(id) ? path.relative(".", id).replace(/\\/g, "/") : `~${id}`
+      )
+      .sort((a, b) => a.localeCompare(b));
     _fs.writeFileSync(cache, JSON.stringify(data, null, 2), "utf8");
   }
   
@@ -136,8 +121,7 @@ function factory({
       });
   }
   
-  // async function getExportType(id) {
-  async function getExportType(id, importer = null) {
+  async function getExportType(id) {
     // get export type from options
     let result;
     result = await getExportTypeFromOptions(id);
@@ -149,19 +133,17 @@ function factory({
       return exportTable[id].named.length ? "named" : "default";
     }
     if (exportTable[id] && exportTable[id].expects) {
-      const trustedExpect = exportTable[id].expects.find(e => e.trusted);
-      if (trustedExpect) {
-        if (trustedExpect.default) {
+      for (const expect of exportTable[id].expects) {
+        if (expect.default) {
           return "default";
         }
-        if (trustedExpect.named.length) {
+        if (expect.named.length || expect.all) {
           return "named";
         }
       }
     }
     // check if id is in preferDefault cache
-    const cache = cjsEsCache.get(id);
-    if (cache && cache.expectBy !== importer) {
+    if (cjsEsCache.has(id)) {
       return "default";
     }
   }
@@ -206,7 +188,8 @@ function factory({
       objectExports,
       finalExportType,
       finalImportType
-    }
+    },
+    guessedIds
   }) {
     if (!exportTable[id]) {
       exportTable[id] = {id};
@@ -216,7 +199,7 @@ function factory({
     exportTable[id].named = finalExportType === "named" ? [...props] : [];
     exportTable[id].exportedProps = [...props];
     exportTable[id].loaded = true;
-    exportTable[id].trusted = !objectExports.size && !namedExports.size && finalExportType === "default";
+    exportTable[id].trusted = !guessedIds.has(id);
     
     await Promise.all(Object.entries(finalImportType).map(async ([name, type]) => {
       const props = importedProperties.get(name) || [];
@@ -240,6 +223,7 @@ function factory({
         exportTable[importee].expects = [];
       }
       importInfo.external = external;
+      importInfo.trusted = !guessedIds.has(importee);
       exportTable[importee].expects.push(importInfo);
     }));
   }
@@ -254,15 +238,18 @@ function factory({
       await updateEsExportTable({context: this, info, id});
       return;
     }
+    const guessedIds = new Set;
     const result = await cjsEs({
       code,
       ast,
       sourceMap,
       importStyle: async requireId => {
         const absId = await this.resolveId(requireId, id);
+        guessedIds.add(absId);
         return getExportType(absId || requireId, id);
       },
       exportStyle: () => {
+        guessedIds.add(id);
         return getExportType(id);
       },
       nested,
@@ -274,7 +261,8 @@ function factory({
       await updateCjsExportTable({
         context: this,
         id,
-        transformContext: result.context
+        transformContext: result.context,
+        guessedIds
       });
       return {
         code: result.code,

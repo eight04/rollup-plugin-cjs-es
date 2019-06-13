@@ -436,9 +436,8 @@ describe("unmatched import/export style and cache", () => {
     `, async resolve => {
       await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
       const cache = JSON.parse(fs.readFileSync(resolve(".cjsescache"), "utf8"));
-      const keys = Object.keys(cache);
-      assert(keys[0].endsWith("bar.js"));
-      assert(keys[1].endsWith("foo.js"));
+      assert(cache[0].endsWith("bar.js"));
+      assert(cache[1].endsWith("foo.js"));
     })
   );
 });
