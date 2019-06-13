@@ -245,7 +245,6 @@ function factory({
   }
   
 	async function transform(code, id) {
-    console.log("transform_id", id);
     if (!filter(id)) {
       return;
     }
@@ -323,7 +322,6 @@ function factory({
   }
 
   function missingExportWarning(importer, type, exporter) {
-    console.log("warning_importer", importer);
     return {
       code: "CJS_ES_MISSING_EXPORT",
       message: `'${r(exporter)}' doesn't export ${type} expected by '${r(importer)}'`,
@@ -334,11 +332,7 @@ function factory({
   }
 
   function r(id) {
-    const relPath = path.relative(".", id);
-    if (/^\.\.[\\/]/.test(relPath)) {
-      return id;
-    }
-    return relPath;
+    return path.relative(".", id);
   }
 }
 
