@@ -32,7 +32,7 @@
     "tempdir-yaml": "^0.3.0"
   },
   "dependencies": {
-    "cjs-es": "^0.7.0",
+    "cjs-es": "^0.8.0",
     "es-info": "^0.3.0",
     "rollup-pluginutils": "^2.8.1"
   },
