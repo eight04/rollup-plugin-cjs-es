@@ -1,6 +1,7 @@
 /* eslint-env mocha */
 const assert = require("assert");
 const fs = require("fs");
+const path = require("path");
 
 const rollup = require("rollup");
 const {withDir} = require("tempdir-yaml");
@@ -226,9 +227,9 @@ describe("unmatched import/export style and cache", () => {
       assert.equal(systemWarns.length, 1);
       
       assert.equal(systemWarns[0].code, "MISSING_EXPORT");
-      assert.equal(systemWarns[0].importer, resolve("entry.js"));
+      assert.equal(path.resolve(systemWarns[0].importer), resolve("entry.js"));
       assert.equal(systemWarns[0].missing, "hasOwnProperty");
-      assert.equal(systemWarns[0].exporter, resolve("foo.js"));
+      assert.equal(path.resolve(systemWarns[0].exporter), resolve("foo.js"));
       
       ({systemWarns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(systemWarns.length, 0);
