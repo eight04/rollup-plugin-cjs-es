@@ -66,8 +66,8 @@ function factory({
   function writeCjsEsCache() {
     const data = Object.entries(exportTable)
       .filter(([, info]) => {
-        // is ES module
         if (info.trusted) {
+          // ES modules or CJS modules that is impossible to export names
           if (info.default && !info.named.length) {
             return true;
           }
@@ -79,9 +79,10 @@ function factory({
           if (trustedExpect && trustedExpect.default) {
             return true;
           }
-          // importer and exporter are both untrustable (cjs module)
           // find missing names
-          if (info.loaded) {
+          // FIXME: should we check if the missing name is an object property?
+          // https://github.com/eight04/rollup-plugin-cjs-es/issues/12
+          if (info.loaded && info.exportedProps) {
             const expect = info.expects.find(e => 
               e.importedProps && e.importedProps.some(n => !info.exportedProps.includes(n))
             );
@@ -93,7 +94,9 @@ function factory({
         return false;
       })
       .map(([id]) =>
-        path.isAbsolute(id) ? path.relative(".", id).replace(/\\/g, "/") : `~${id}`
+        path.isAbsolute(id) ?
+          path.relative(".", id).replace(/\\/g, "/") :
+          `~${id}`
       )
       .sort((a, b) => a.localeCompare(b));
     _fs.writeFileSync(cache, JSON.stringify(data, null, 2), "utf8");
@@ -123,8 +126,7 @@ function factory({
   
   async function getExportType(id) {
     // get export type from options
-    let result;
-    result = await getExportTypeFromOptions(id);
+    const result = await getExportTypeFromOptions(id);
     if (result) {
       return result;
     }
