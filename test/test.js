@@ -216,6 +216,19 @@ describe("unmatched import/export style and cache", () => {
     })
   );
   
+  it("don't warn with bare import (name)", () =>
+    withDir(`
+      - entry.js: |
+          import "./foo.js";
+      - foo.js: |
+          exports.foo = "foo";
+    `, async resolve => {
+      let warns;
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
+    })
+  );
+  
   it("import default if others import default", () =>
     withDir(`
       - entry.js: |
