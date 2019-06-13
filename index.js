@@ -323,6 +323,7 @@ function factory({
   }
 
   function missingExportWarning(importer, type, exporter) {
+    console.log("warning_importer", importer);
     return {
       code: "CJS_ES_MISSING_EXPORT",
       message: `'${r(exporter)}' doesn't export ${type} expected by '${r(importer)}'`,
