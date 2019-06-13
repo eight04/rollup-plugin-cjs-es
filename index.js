@@ -245,6 +245,7 @@ function factory({
   }
   
 	async function transform(code, id) {
+    console.log("transform_id", id);
     if (!filter(id)) {
       return;
     }
@@ -332,7 +333,6 @@ function factory({
   }
 
   function r(id) {
-    console.log(id);
     const relPath = path.relative(".", id);
     if (/^\.\.[\\/]/.test(relPath)) {
       return id;
