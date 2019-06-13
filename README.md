@@ -1,8 +1,8 @@
 rollup-plugin-cjs-es
 ====================
 
-[![Build Status](https://travis-ci.org/eight04/rollup-plugin-cjs-es.svg?branch=master)](https://travis-ci.org/eight04/rollup-plugin-cjs-es)
-[![Coverage Status](https://coveralls.io/repos/github/eight04/rollup-plugin-cjs-es/badge.svg?branch=master)](https://coveralls.io/github/eight04/rollup-plugin-cjs-es?branch=master)
+[![Build Status](https://travis-ci.com/eight04/rollup-plugin-cjs-es.svg?branch=master)](https://travis-ci.com/eight04/rollup-plugin-cjs-es)
+[![codecov](https://codecov.io/gh/eight04/rollup-plugin-cjs-es/branch/master/graph/badge.svg)](https://codecov.io/gh/eight04/rollup-plugin-cjs-es)
 [![install size](https://packagephobia.now.sh/badge?p=rollup-plugin-cjs-es)](https://packagephobia.now.sh/result?p=rollup-plugin-cjs-es)
 
 Convert CommonJS module into ES module. Powered by [cjs-es](https://github.com/eight04/cjs-es).
@@ -323,6 +323,12 @@ cjsEsFactory(options?:Object) => rollupPlugin
 
 Changelog
 ---------
+
+* 0.9.0 (Jun 14, 2019)
+
+  - **Breaking: cache format is chanaged. You may have to delete the old one.**
+  - **Breaking: bump node version to use async/await.**
+  - Add: analyze missing exports and fallback to default object.
 
 * 0.8.0 (Jun 5, 2019)
 

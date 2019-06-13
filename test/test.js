@@ -1,6 +1,7 @@
 /* eslint-env mocha */
 const assert = require("assert");
 const fs = require("fs");
+const path = require("path");
 
 const rollup = require("rollup");
 const {withDir} = require("tempdir-yaml");
@@ -11,15 +12,17 @@ const cjsEs = require("..");
 
 async function bundle(file, options, rollupOptions = {}) {
   const warns = [];
+  const systemWarns = [];
   const bundle = await rollup.rollup({
     input: [file],
     plugins: [
       cjsEs(Object.assign({cache: false, nested: true}, options))
     ],
-    experimentalCodeSplitting: true,
     onwarn(warn) {
       if (warn.code === "PLUGIN_WARNING") {
         warns.push(warn);
+      } else {
+        systemWarns.push(warn);
       }
     },
     ...rollupOptions
@@ -32,6 +35,7 @@ async function bundle(file, options, rollupOptions = {}) {
     sourcemap: true
   });
   result.warns = warns;
+  result.systemWarns = systemWarns;
   result.modules = modules;
   result.namedOutput = result.output.reduce(
     (o, output) => {
@@ -159,7 +163,7 @@ describe("exportType option", () => {
 
 describe("unmatched import/export style and cache", () => {
   // warn users if the import style doesn't match the actual exports
-  it("import default if importee exports default", () =>
+  it("warn if import names and importee exports default", () =>
     withDir(`
       - entry.js: |
           const foo = require("./foo");
@@ -170,6 +174,43 @@ describe("unmatched import/export style and cache", () => {
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 1);
       assert(/foo\.js.*? doesn't export names expected by .*?entry\.js/.test(warns[0].message));
+      
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
+      
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
+    })
+  );
+  
+  it("warn if import names and importee exports default (force)", () =>
+    withDir(`
+      - entry.js: |
+          import {foo} from "./foo.js";
+      - foo.js: |
+          module.exports = "foo";
+    `, async resolve => {
+      let warns;
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 1);
+      assert(/foo\.js.*? doesn't export names expected by .*?entry\.js/.test(warns[0].message));
+      
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 1);
+      
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 1);
+    })
+  );
+  
+  it("don't warn with bare import", () =>
+    withDir(`
+      - entry.js: |
+          import "./foo.js";
+      - foo.js: |
+          module.exports = "foo";
+    `, async resolve => {
+      let warns;
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
     })
@@ -198,10 +239,40 @@ describe("unmatched import/export style and cache", () => {
       
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
+      
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
     })
   );
   
-  it("import names but others import default (bad config)", () =>
+  it("import default if the name is missing and the name is an object method", () =>
+    withDir(`
+      - entry.js: |
+          const foo = require("./foo");
+          console.log(foo.hasOwnProperty("foo"));
+      - foo.js: |
+          module.exports = {
+            foo: "foo"
+          };
+    `, async resolve => {
+      let systemWarns;
+      ({systemWarns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(systemWarns.length, 1);
+      
+      assert.equal(systemWarns[0].code, "MISSING_EXPORT");
+      assert.equal(path.resolve(systemWarns[0].importer), resolve("entry.js"));
+      assert.equal(systemWarns[0].missing, "hasOwnProperty");
+      assert.equal(path.resolve(systemWarns[0].exporter), resolve("foo.js"));
+      
+      ({systemWarns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(systemWarns.length, 0);
+      
+      ({systemWarns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(systemWarns.length, 0);
+    })
+  );
+  
+  it("warn if import default and importee export names (bad config)", () =>
     withDir(`
       - entry.js: |
           const foo = require("./foo");
@@ -213,8 +284,13 @@ describe("unmatched import/export style and cache", () => {
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
       assert.equal(warns.length, 1);
       assert(/foo\.js' doesn't export default expected by .*?entry\.js/.test(warns[0].message));
+      
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
       assert.equal(warns.length, 1);
+      
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
+      
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
     })
@@ -242,6 +318,10 @@ describe("unmatched import/export style and cache", () => {
       
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
       assert.equal(warns.length, 1);
+      
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
+      
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
     })
@@ -347,8 +427,8 @@ describe("unmatched import/export style and cache", () => {
   it("the cache is ordered", () =>
     withDir(`
       - entry.js: |
-          require("./foo")
-          require("./bar")
+          require("./foo");
+          require("./bar");
       - foo.js: |
           module.exports = "foo";
       - bar.js: |
@@ -356,9 +436,8 @@ describe("unmatched import/export style and cache", () => {
     `, async resolve => {
       await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
       const cache = JSON.parse(fs.readFileSync(resolve(".cjsescache"), "utf8"));
-      const keys = Object.keys(cache);
-      assert(keys[0].endsWith("bar.js"));
-      assert(keys[1].endsWith("foo.js"));
+      assert(cache[0].endsWith("bar.js"));
+      assert(cache[1].endsWith("foo.js"));
     })
   );
 });
