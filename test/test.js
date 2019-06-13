@@ -173,6 +173,10 @@ describe("unmatched import/export style and cache", () => {
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 1);
       assert(/foo\.js.*? doesn't export names expected by .*?entry\.js/.test(warns[0].message));
+      
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
+      
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
     })
@@ -198,6 +202,9 @@ describe("unmatched import/export style and cache", () => {
       assert.equal(warns[0].importer, resolve("bar.js"));
       assert.equal(warns[0].importerExpect, "default");
       assert.equal(warns[0].exporter, resolve("foo.js"));
+      
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
       
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
@@ -243,8 +250,13 @@ describe("unmatched import/export style and cache", () => {
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
       assert.equal(warns.length, 1);
       assert(/foo\.js' doesn't export default expected by .*?entry\.js/.test(warns[0].message));
+      
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
       assert.equal(warns.length, 1);
+      
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
+      
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
     })
@@ -272,6 +284,10 @@ describe("unmatched import/export style and cache", () => {
       
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache"), exportType}));
       assert.equal(warns.length, 1);
+      
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
+      
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
     })
@@ -377,8 +393,8 @@ describe("unmatched import/export style and cache", () => {
   it("the cache is ordered", () =>
     withDir(`
       - entry.js: |
-          require("./foo")
-          require("./bar")
+          require("./foo");
+          require("./bar");
       - foo.js: |
           module.exports = "foo";
       - bar.js: |
