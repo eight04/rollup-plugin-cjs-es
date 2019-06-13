@@ -216,10 +216,23 @@ describe("unmatched import/export style and cache", () => {
     })
   );
   
-  it("don't warn with bare import (name)", () =>
+  it("don't warn with bare import (cjs)", () =>
     withDir(`
       - entry.js: |
-          import "./foo.js";
+          require("./foo");
+      - foo.js: |
+          module.exports = "foo";
+    `, async resolve => {
+      let warns;
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
+    })
+  );
+  
+  it("don't warn with bare import (cjs + name)", () =>
+    withDir(`
+      - entry.js: |
+          require("./foo");
       - foo.js: |
           exports.foo = "foo";
     `, async resolve => {
