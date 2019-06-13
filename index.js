@@ -175,7 +175,7 @@ function factory({
     exportTable[id].loaded = true;
     
     await Promise.all(Object.entries(info.import).map(async ([name, importInfo]) => {
-      if (!importInfo.default && !importInfo.named) {
+      if (!importInfo.default && !importInfo.named.length && !importInfo.all) {
         return;
       }
       importInfo.id = id;

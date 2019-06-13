@@ -163,7 +163,7 @@ describe("exportType option", () => {
 
 describe("unmatched import/export style and cache", () => {
   // warn users if the import style doesn't match the actual exports
-  it("import default if importee exports default", () =>
+  it("warn if import names and importee exports default", () =>
     withDir(`
       - entry.js: |
           const foo = require("./foo");
@@ -178,6 +178,39 @@ describe("unmatched import/export style and cache", () => {
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
       
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 0);
+    })
+  );
+  
+  it("warn if import names and importee exports default (force)", () =>
+    withDir(`
+      - entry.js: |
+          import {foo} from "./foo.js";
+      - foo.js: |
+          module.exports = "foo";
+    `, async resolve => {
+      let warns;
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 1);
+      assert(/foo\.js.*? doesn't export names expected by .*?entry\.js/.test(warns[0].message));
+      
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 1);
+      
+      ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
+      assert.equal(warns.length, 1);
+    })
+  );
+  
+  it("don't warn with bare import", () =>
+    withDir(`
+      - entry.js: |
+          import "./foo.js";
+      - foo.js: |
+          module.exports = "foo";
+    `, async resolve => {
+      let warns;
       ({warns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
       assert.equal(warns.length, 0);
     })
@@ -239,7 +272,7 @@ describe("unmatched import/export style and cache", () => {
     })
   );
   
-  it("import names but others import default (bad config)", () =>
+  it("warn if import default and importee export names (bad config)", () =>
     withDir(`
       - entry.js: |
           const foo = require("./foo");
