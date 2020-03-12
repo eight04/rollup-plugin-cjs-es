@@ -31,9 +31,9 @@
     "tempdir-yaml": "^0.3.0"
   },
   "dependencies": {
+    "@rollup/pluginutils": "^3.0.8",
     "cjs-es": "^0.8.0",
-    "es-info": "^0.3.0",
-    "rollup-pluginutils": "^2.8.1"
+    "es-info": "^0.3.0"
   },
   "peerDependencies": {
     "rollup": "^1.15.2"
