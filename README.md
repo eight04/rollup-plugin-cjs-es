@@ -324,6 +324,10 @@ cjsEsFactory(options?:Object) => rollupPlugin
 Changelog
 ---------
 
+* 1.0.0 (Mar 13, 2020)
+
+  - **Breaking: bump rollup to 2.0**
+
 * 0.9.0 (Jun 14, 2019)
 
   - **Breaking: cache format is chanaged. You may have to delete the old one.**
