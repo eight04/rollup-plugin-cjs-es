@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 const {transform: cjsEs} = require("cjs-es");
-const {createFilter} = require("rollup-pluginutils");
+const {createFilter} = require("@rollup/pluginutils");
 const {analyze: esInfoAnalyze} = require("es-info");
 
 function isEsModule(result) {
@@ -112,7 +112,7 @@ function factory({
     if (typeof exportType === "object") {
       return exportType[id];
     }
-    if (exportTypeCache.hasOwnProperty(id)) {
+    if (Object.prototype.hasOwnProperty.call(exportTypeCache, id)) {
       return exportTypeCache[id];
     }
     return Promise.resolve(exportType(id))
@@ -150,94 +150,19 @@ function factory({
     }
   }
   
-  async function updateEsExportTable({id, context, info}) {
-    if (!exportTable[id]) {
-      exportTable[id] = {id};
-    }
-    Object.assign(exportTable[id], info.export);
-    exportTable[id].trusted = true;
-    exportTable[id].loaded = true;
-    
-    await Promise.all(Object.entries(info.import).map(async ([name, importInfo]) => {
-      if (!importInfo.default && !importInfo.named.length && !importInfo.all) {
-        return;
-      }
-      importInfo.id = id;
-      importInfo.trusted = true;
-      let importee = await context.resolveId(name, id);
-      let external = false;
-      if (!importee) {
-        importee = name;
-        external = true;
-      }
-      if (!exportTable[importee]) {
-        exportTable[importee] = {id: importee};
-      }
-      if (!exportTable[importee].expects) {
-        exportTable[importee].expects = [];
-      }
-      importInfo.external = external;
-      exportTable[importee].expects.push(importInfo);
-    }));
-  }
-  
-  async function updateCjsExportTable({
-    id,
-    context,
-    transformContext: {
-      importedProperties,
-      namedExports,
-      objectExports,
-      finalExportType,
-      finalImportType
-    },
-    guessedIds
-  }) {
-    if (!exportTable[id]) {
-      exportTable[id] = {id};
-    }
-    const props = new Set([...namedExports.keys(), ...objectExports.keys()]);
-    exportTable[id].default = finalExportType === "default";
-    exportTable[id].named = finalExportType === "named" ? [...props] : [];
-    exportTable[id].exportedProps = [...props];
-    exportTable[id].loaded = true;
-    exportTable[id].trusted = !guessedIds.has(id);
-    
-    await Promise.all(Object.entries(finalImportType).map(async ([name, type]) => {
-      const props = importedProperties.get(name) || [];
-      const importInfo = {
-        id,
-        named: type === "named" ? [...props] : [],
-        default: type === "default",
-        all: type === "named" && !props.length,
-        importedProps: [...props]
-      };
-      let importee = await context.resolveId(name, id);
-      let external = false;
-      if (!importee) {
-        importee = name;
-        external = true;
-      }
-      if (!exportTable[importee]) {
-        exportTable[importee] = {id: importee};
-      }
-      if (!exportTable[importee].expects) {
-        exportTable[importee].expects = [];
-      }
-      importInfo.external = external;
-      importInfo.trusted = !guessedIds.has(importee);
-      exportTable[importee].expects.push(importInfo);
-    }));
-  }
-  
 	async function transform(code, id) {
     if (!filter(id)) {
       return;
     }
     const ast = this.parse(code);
     const info = esInfoAnalyze({ast});
+    const exportTableUpdater = createExportTableUpdater({
+      id,
+      exportTable,
+      resolve: this.resolve.bind(this)
+    });
     if (isEsModule(info)) {
-      await updateEsExportTable({context: this, info, id});
+      await exportTableUpdater.updateFromEs(info);
       return;
     }
     const guessedIds = new Set;
@@ -246,9 +171,10 @@ function factory({
       ast,
       sourceMap,
       importStyle: async requireId => {
-        const absId = await this.resolveId(requireId, id);
-        guessedIds.add(absId);
-        return getExportType(absId || requireId, id);
+        const result = await this.resolve(requireId, id);
+        const finalId = result ? result.id : requireId;
+        guessedIds.add(finalId);
+        return getExportType(finalId, id);
       },
       exportStyle: () => {
         guessedIds.add(id);
@@ -260,12 +186,7 @@ function factory({
       }
     });
     if (result.isTouched) {
-      await updateCjsExportTable({
-        context: this,
-        id,
-        transformContext: result.context,
-        guessedIds
-      });
+      await exportTableUpdater.updateFromCjs(result.context, guessedIds);
       return {
         code: result.code,
         map: result.map
@@ -324,6 +245,85 @@ function factory({
   function r(id) {
     return path.relative(".", id);
   }
+}
+
+function createExportTableUpdater({id, exportTable, resolve}) {
+  return {updateFromCjs, updateFromEs};
+  
+  async function resolveImportee(name) {
+    const result = await resolve(name, id);
+    return result || {
+      id: name,
+      external: true
+    };
+  }
+  
+  function addExpect(id, expect) {
+    if (!exportTable[id]) {
+      exportTable[id] = {id};
+    }
+    if (!exportTable[id].expects) {
+      exportTable[id].expects = [];
+    }
+    exportTable[id].expects.push(expect);
+  }
+  
+  async function updateFromEs(info) {
+    if (!exportTable[id]) {
+      exportTable[id] = {id};
+    }
+    Object.assign(exportTable[id], info.export);
+    exportTable[id].trusted = true;
+    exportTable[id].loaded = true;
+    
+    await Promise.all(Object.entries(info.import).map(async ([name, importInfo]) => {
+      if (!importInfo.default && !importInfo.named.length && !importInfo.all) {
+        return;
+      }
+      const importee = await resolveImportee(name);
+      importInfo.id = id;
+      importInfo.trusted = true;
+      importInfo.external = importee.external;
+      addExpect(importee.id, importInfo);
+    }));
+  }
+  
+  async function updateFromCjs(
+    {
+      importedProperties,
+      namedExports,
+      objectExports,
+      finalExportType,
+      finalImportType
+    },
+    guessedIds
+  ) {
+    if (!exportTable[id]) {
+      exportTable[id] = {id};
+    }
+    const props = new Set([...namedExports.keys(), ...objectExports.keys()]);
+    exportTable[id].default = finalExportType === "default";
+    exportTable[id].named = finalExportType === "named" ? [...props] : [];
+    exportTable[id].exportedProps = [...props];
+    exportTable[id].loaded = true;
+    exportTable[id].trusted = !guessedIds.has(id);
+    
+    await Promise.all(Object.entries(finalImportType).map(async ([name, type]) => {
+      const props = importedProperties.get(name) || [];
+      const importee = await resolveImportee(name);
+      const importInfo = {
+        id,
+        named: type === "named" ? [...props] : [],
+        default: type === "default",
+        all: type === "named" && !props.length,
+        importedProps: [...props],
+        external: importee.external,
+        trusted: !guessedIds.has(importee.id)
+      };
+      addExpect(importee.id, importInfo);
+    }));
+  }
+  
 }
 
 module.exports = factory;
