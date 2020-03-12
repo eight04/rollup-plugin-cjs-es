@@ -30,7 +30,6 @@ async function bundle(file, options, rollupOptions = {}) {
   const modules = bundle.cache.modules.slice();
   const result = await bundle.generate({
     format: "es",
-    legacy: true,
     freeze: false,
     sourcemap: true
   });
@@ -149,9 +148,10 @@ describe("exportType option", () => {
       assert.equal(output["entry.js"].code.trim(), endent`
         const _export_foo_ = "FOO";
         
-        var foo = ({
+        var foo = {
+          __proto__: null,
           foo: _export_foo_
-        });
+        };
         
         var entry = {foo};
         
@@ -388,7 +388,7 @@ describe("unmatched import/export style and cache", () => {
     withDir(`
       - entry.js: |
           require("./bar");
-          require("./baz");
+          require("./bak");
       - foo.js: |
           export const foo = "foo";
           export default () => {};
@@ -397,6 +397,8 @@ describe("unmatched import/export style and cache", () => {
       - baz.js: |
           const foo = require("./foo");
           foo();
+      - bak.js: |
+          require("./baz"); // make rollup loads baz.js after bar.js
     `, async resolve => {
       {
         const {warns, modules} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")});
