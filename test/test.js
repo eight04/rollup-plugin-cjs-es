@@ -5,7 +5,7 @@ const path = require("path");
 
 const rollup = require("rollup");
 const {withDir} = require("tempdir-yaml");
-const endent = require("endent");
+const {default: endent} = require("endent");
 const sinon = require("sinon");
 
 const cjsEs = require("..");
