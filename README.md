@@ -324,6 +324,11 @@ cjsEsFactory(options?:Object) => rollupPlugin
 Changelog
 ---------
 
+* 1.0.1 (Jul 27, 2020)
+
+  - Bump dependencies.
+  - Fix: drop `this.isExternal`.
+
 * 1.0.0 (Mar 13, 2020)
 
   - **Breaking: bump rollup to 2.0**
