@@ -201,7 +201,7 @@ function factory({
         continue;
       }
       if (!exportInfo.loaded) {
-        if (!this.isExternal(exportInfo.id)) {
+        if (exportInfo.expects.some(e => !e.external)) {
           this.warn({
             code: "CJS_ES_NOT_LOADED",
             moduleId: exportInfo.id,
@@ -254,7 +254,9 @@ function createExportTableUpdater({id, exportTable, resolve}) {
     const result = await resolve(name, id);
     return result || {
       id: name,
-      external: true
+      // treat unresolveable id as non-external
+      // https://github.com/rollup/rollup/issues/3692
+      external: false
     };
   }
   
