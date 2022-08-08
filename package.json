@@ -22,21 +22,21 @@
   "author": "eight04 <eight04@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "c8": "^7.2.1",
-    "endent": "^2.0.1",
-    "eslint": "^7.5.0",
-    "mocha": "^8.0.1",
-    "rollup": "^2.23.0",
-    "sinon": "^9.0.2",
+    "c8": "^7.12.0",
+    "endent": "^2.1.0",
+    "eslint": "^8.21.0",
+    "mocha": "^10.0.0",
+    "rollup": "^2.77.2",
+    "sinon": "^14.0.0",
     "tempdir-yaml": "^0.3.0"
   },
   "dependencies": {
-    "@rollup/pluginutils": "^3.1.0",
-    "cjs-es": "^0.8.2",
-    "es-info": "^0.3.0"
+    "@rollup/pluginutils": "^4.2.1",
+    "cjs-es": "^0.9.0",
+    "es-info": "^0.4.0"
   },
   "peerDependencies": {
-    "rollup": "^2.23.0"
+    "rollup": "^2.77.2"
   },
   "engines": {
     "node": ">= 7.10"
