@@ -1,7 +1,7 @@
 rollup-plugin-cjs-es
 ====================
 
-[![Build Status](https://travis-ci.com/eight04/rollup-plugin-cjs-es.svg?branch=master)](https://travis-ci.com/eight04/rollup-plugin-cjs-es)
+[![.github/workflows/build.yml](https://github.com/eight04/rollup-plugin-cjs-es/actions/workflows/build.yml/badge.svg)](https://github.com/eight04/rollup-plugin-cjs-es/actions/workflows/build.yml)
 [![codecov](https://codecov.io/gh/eight04/rollup-plugin-cjs-es/branch/master/graph/badge.svg)](https://codecov.io/gh/eight04/rollup-plugin-cjs-es)
 [![install size](https://packagephobia.now.sh/badge?p=rollup-plugin-cjs-es)](https://packagephobia.now.sh/result?p=rollup-plugin-cjs-es)
 
@@ -323,6 +323,11 @@ cjsEsFactory(options?:Object) => rollupPlugin
 
 Changelog
 ---------
+
+* 1.1.0 (Aug 8, 2022)
+
+  - Bump dependencies.
+  - Fix: variable is used before defined.
 
 * 1.0.1 (Jul 27, 2020)
 
