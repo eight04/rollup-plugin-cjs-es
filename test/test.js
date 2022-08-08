@@ -97,7 +97,7 @@ describe("exportType option", () => {
         
         var entry = {foo};
         
-        export default entry;
+        export { entry as default };
       `);
     })
   );
@@ -155,7 +155,7 @@ describe("exportType option", () => {
         
         var entry = {foo};
         
-        export default entry;
+        export { entry as default };
       `);
     })
   );

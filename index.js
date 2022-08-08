@@ -155,7 +155,7 @@ function factory({
       return;
     }
     const ast = this.parse(code);
-    const info = esInfoAnalyze({ast});
+    const info = await esInfoAnalyze({ast});
     const exportTableUpdater = createExportTableUpdater({
       id,
       exportTable,
