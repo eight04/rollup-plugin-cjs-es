@@ -324,6 +324,10 @@ cjsEsFactory(options?:Object) => rollupPlugin
 Changelog
 ---------
 
+* 2.0.0 (Oct 17, 2022)
+
+  - Breaking: bump rollup to 3.0
+
 * 1.1.0 (Aug 8, 2022)
 
   - Bump dependencies.
