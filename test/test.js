@@ -31,7 +31,7 @@ async function bundle(file, options, rollupOptions = {}) {
   const result = await bundle.generate({
     format: "es",
     freeze: false,
-    sourcemap: true
+    sourcemap: false
   });
   result.warns = warns;
   result.systemWarns = systemWarns;
@@ -286,8 +286,7 @@ describe("unmatched import/export style and cache", () => {
       assert.equal(systemWarns.length, 1);
       
       assert.equal(systemWarns[0].code, "MISSING_EXPORT");
-      assert.equal(path.resolve(systemWarns[0].importer), resolve("entry.js"));
-      assert.equal(systemWarns[0].missing, "hasOwnProperty");
+      assert.equal(systemWarns[0].binding, "hasOwnProperty");
       assert.equal(path.resolve(systemWarns[0].exporter), resolve("foo.js"));
       
       ({systemWarns} = await bundle(resolve("entry.js"), {cache: resolve(".cjsescache")}));
